@@ -49,7 +49,6 @@ from MD_Backbone import *
 from MD_DB import *
 from MD_Align import *
 from MD_BA_class2 import *
-from MD_Output import *
 #from BB_yklee import *
 
 class bcolors:
@@ -2580,317 +2579,14 @@ def Core_ExCP(ln_slist,slist,tmp_list,Main_list,Re_dic,ele):
     tmp_list=[]
 
     return
-def yklee_work_help():
-	print("""
-	=================================================================
-	#	About a_type : It is Working type                           #
-	=================================================================
-	#################################################################
-	# a_type == 0 : Tier 1 Exact Matching                           #
-	# a_type == 1 : Tier 1.5 Matching --> Inter-Ring Search Method  #
-	# a_type == 2 : Tier 1.6 Matching --> Backbone Alignment Method #
-    # a_type == 3 : ZINC_ADC Matching --> Extract ADC compound      #
-	#################################################################
-""")
-def yklee_work(a_type):
-	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs
-	T1_pcscore_cutoff = 0.98
-	ring_cutoff = 1
-	N_ZIDs_cutoff = 7500 #1500
-	global oPath,DB_Path
-	iPath = "./Data/Input/"
-	oPath = "./Data/ADC_Output/Files/"
-	rei_img_Path = "./Data/Re_Input/IMG/"
-
-	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
-	
-	TR_MW = 38.0
-
-	shutil.rmtree(oPath)
-	os.mkdir(oPath)
-	
-	shutil.rmtree(rei_img_Path)
-	os.mkdir(rei_img_Path)
-
-	if_list = sorted(glob.glob(iPath + "*.smi"))
-	if len(if_list) == 0:
-		print("No Input Files")
-		sys.exit(1)
-	
-	Main_list = []
-	re = []
-	sum_df = []
-	
-	alp = 0
-
-	out_file1 = "./Data/ADC_Output/Out_Summary.csv"
-	out_file2 = "./Data/ADC_Output/Error_SMILES.csv"
-	for afile in if_list:
-		alp += 1
-		M_MW = 0.1
-		ZIDs = []
-		asmi = Read_SMILES_FILE(afile)
-		Input_CP = Extract_CP(asmi)
-
-		fn = os.path.basename(afile)
-		file_name = os.path.splitext(fn)[0]
-		##################
-		# Activaion Part #
-		##################
-		if a_type == 0:
-			bblist = working_a0(asmi,file_name)
-			if bblist == -1:
-				print("No ZIDs Match \nSMILES : %s"%asmi)
-				pass
-		elif a_type == 1:
-			bblist = working_a1(asmi,file_name,afile)
-			if bblist == -1:
-				print("No BB Match \nSMILES : %s"%asmi)
-				pass
-		elif a_type == 2:
-			total_df = working_a2(asmi,file_name,Input_CP)
-			if total_df.empty:
-				bblist = -1
-			else:
-				bblist = 1
-		elif a_type == 3:
-			total_df = working_ZADC(asmi,file_name,afile,Input_CP)
-			if total_df.empty:
-				bblist = -1
-			else: 
-				bblist = 1
-		else:
-			sys.exit(1)
-
-		######################
-		# Make Result Format #
-		######################
-		if bblist == -1:
-			pass
-		else:
-			if a_type == 0 or a_type == 1:
-				ZIDs,zdf = BB_Align_Class_Search(Extract_BB(asmi),file_name,bblist,ZIDs,N_ZIDs_cutoff)
-				if zdf.empty or zdf is None:
-					sum_df = pd.DataFrame()
-				else:
-					sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),zdf)
-			#elif a_type == 3 and type(total_df) == type(pd.DataFrame()):
-			
-			else:
-				sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),total_df)
-
-		################
-		# Make Summary #
-		################
-		if bblist == -1:
-			pass
-		else:
-			if sum_df.empty:
-				with open(out_file2,"a") as W:
-					W.write(asmi + '\n')
-			else:
-				if not os.path.exists(out_file1):
-					sum_df.to_csv(out_file1,index=False,mode="w")
-				else:
-					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
-
-def working_a0(asmi,file_name):
-	######################
-	# Tier 1 Exact Match #
-	######################
-	tmp_list = []
-	id_smi = {}
-	re_list = set()
-	aBB = Extract_BB(asmi)
-	ZIDs = T1_Class_Search(aBB,file_name,m_type=1)
-	if ZIDs == -1:
-		return -1
-	else:
-		for zids in ZIDs:
-			tmp_df = Fetch_Purch_Annot(zids,DB_Path)
-		if tmp_df is None:
-			pass
-		elif ''.join(tmp_df["Purchasability"].tolist()) == "Unknown":
-			pass
-		else:
-			tmp_list.append(tmp_df)
-	if not tmp_list:
-		sys.exit(1)
-
-	else:
-		tmp_df = pd.concat(tmp_list)
-		idx = 0
-		for i in tmp_df["ZID"]:
-			Fetch_SMILES_by_ID(i,id_smi,DB_Path)
-		for i in list(set(id_smi.values())):
-			re_list.add(Extract_BB(i))
-
-	re_list = list(re_list)
-	return re_list
-	
-def working_a1(asmi,file_name,afile):
-	######################################
-	# Tier 1.5 Match , Inter-Ring Search #
-	######################################
-	M_MW = 0.1
-	TR_MW = 38.0
-	Ok_flag = 0
-	idx = 0
-	aBB = Extract_BB(asmi) 
-	re_list = working_a0(aBB,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	Total_re_list = T15_Class_Search_yklee(afile,TR_MW,M_MW)
-	return Total_re_list
-def BB_Query_parameters(asmi,mw_percent):
-	omol = readstring("smi",asmi)
-	csmi = "C"*(len(omol.atoms)-4) + "NNOO"
-	CsmiCP = Extract_CP(csmi)
-	InputCP = Extract_CP(asmi)
-	tmp_li = [CsmiCP["MW"],InputCP["MW"]]
-
-	Input_Num_Ring = InputCP["Ring"]
-	Input_MW = np.float64(max(tmp_li))
-
-	per_MW = Input_MW*np.float64(mw_percent)/np.float64(100.0)
-	tper_MW = Input_MW*np.float64(mw_percent-1.0)/np.float64(100.0)
-	if mw_percent == 1.0:
-		up_MW = Input_MW + per_MW
-		low_MW = Input_MW - per_MW
-		return (low_MW,up_MW,Input_Num_Ring)
-
-	else:
-		uu_MW = Input_MW + per_MW
-		ul_MW = Input_MW + tper_MW
-
-		lu_MW = Input_MW - tper_MW
-		ll_MW = Input_MW - per_MW
-
-		return (ll_MW,lu_MW,ul_MW,uu_MW,Input_Num_Ring)
-def working_a2(asmi,file_name,InputCP):
-	df_list = []
-	df_list_t = []
-	df_list2 = []
-	df_list3 = []
-	pur_ls = []
-	#idid = []
-	t_idset = set()
-	id_BB = {}
-	re_list = []
-	t_smiset = set()
-
-	BB_dic = {}
-	Osmi_dic = {}
-	df_list = []
-	aBB = Extract_BB(asmi)
-	out_csv_path = "./Data/ADC_Output/"
-	
-	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* "+ file_name
-	if not re_list :
-		re_list = working_a0(aBB,file_name)
-	elif re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	mw_percent = 1.0
-	break_flag = 0
-	n_bbs = 0
-	while break_flag == 0:
-		query_entities = BB_Query_parameters(asmi,mw_percent)
-		break_flag,n_bbs = Fetch_BB_BY_MW_RingNum_temp(BB_dic,Osmi_dic,query_entities,mw_percent,n_bbs,DB_Path)
-		mw_percent += 1.0
-	lenid = len(BB_dic)//9
-
-	div_keys = list(divide_list(BB_dic.values(),lenid))
-	div_ids = list(divide_list(BB_dic.keys(),lenid))
-	a = 0
-	for ids,keys in zip(div_ids,div_keys):
-		a += 1
-		smiles = []
-		Align_DF = AlignM3D(file_name,aBB,ids,keys)
-		for i in Align_DF["Query"]:
-			smiles.append(Osmi_dic[i]["Osmi"])
-		Align_DF["SMILES"] = smiles
-		Align_DF.to_csv(file_name + ".%d"%a + ".csv",index=False)
-	for i in glob.glob(file_name + "*.csv"):
-		df_list.append(pd.read_csv(i))
-		os.remove(i)
-	fin_df = pd.concat(df_list).sort_values(by="PCScore",ascending=False)
-	fin_df.to_csv(file_name + ".total.csv",index=False)
-	smi_list = fin_df["SMILES"]
-	for smi in smi_list:
-		idid = []
-		pcscore = np.float64(fin_df[fin_df["SMILES"] == smi]["PCScore"][:1])
-		dd = Fetch_BB_smis(smi,t_smiset,DB_Path)
-		if dd is None:
-			id_df = None
-			pass
-		else:
-			for t_smi in dd:
-				Fetch_BB_IDs(t_smi,idid,id_BB,DB_Path)
-			id_df = Final_Annot(idid,id_BB,pcscore,DB_Path)
-
-		df_list_t.append(id_df)
-		if id_df is None:
-			pass
-		else:
-			t_idset = t_idset | set(id_df["ZID"].tolist())
-			print(len(t_idset))
-		if len(t_idset) >= int(N_ZIDs_cutoff):
-			break
-		else:
-			pass
-	fin_df = pd.concat(df_list_t).drop_duplicates()
-	for i in t_idset:
-		drop_df = fin_df[fin_df["ZID"] == i].sort_values(by="PCScore",ascending=False)[:1]
-		df_list3.append(drop_df)
-	fin_df = pd.concat(df_list3).sort_values(by="PCScore",ascending=False)
-
-	za_df = AlignM3D(file_name,asmi,fin_df["ZID"],fin_df["SMILES"]).rename(columns={"Query":"ZID","PCScore":"Z_PCScore"}).drop(["Template"],axis=1)
-	fin_df = reduce(lambda x,y : pd.merge(x,y,on="ZID"),[fin_df,za_df]).rename(columns={"PCScore":"BB_PCScore"}).sort_values(by="Z_PCScore",ascending=False)
-	fin_df = pd.concat([wsmi_df,fin_df])
-	fin_df = fin_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability"]]
-	fin_df.reset_index(drop=True,inplace=True)
-	fin_df = fin_df[fin_df["Z_PCScore"] > 0.75 ] # Z PCScore Cutoff
-	fin_df.to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
-
-	return fin_df
-def working_ZADC(asmi,file_name,afile,InputCP):
-	ZIDs = []
-	aBB = Extract_BB(asmi)
-	re_list = working_a0(aBB,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	re_list1 = working_a1(asmi,file_name,afile)
-	if re_list1 == -1: # Check inner-Scaffold
-		fin_df = working_a2(asmi,file_name,InputCP) # if mol don't have inner-Scaffold,it do Backbone Align
-		return fin_df
-	else:
-		re_list = re_list|set(re_list1)
-
-	ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
-	if len(ZIDs) >= N_ZIDs_cutoff:
-		return zdf
-	else:
-		fin_df = working_a2(asmi,file_name,InputCP)
-		tfin_df = pd.concat([zdf,fin_df]).drop_duplicates().reset_index(drop=True)
-		zdf = tfin_df
-		print(zdf)
-		return zdf
-	
 
 
 def Extract_ADC():
-
+   
     global T1_pcscore_cutoff,N_ZIDs_cutoff
     T1_pcscore_cutoff=0.98
     ring_cutoff=1
-    N_ZIDs_cutoff = 1500
+    N_ZIDs_cutoff = 5
 
     iPath='./Data/Input/'
     global oPath
@@ -2900,9 +2596,9 @@ def Extract_ADC():
     #DB_Path='./Data/DB_Tables/'
     #DB_Path='../3D_Scan/Data/DB_Table/'
     global DB_Path
-    #DB_Path='/ssd/swshin/1D_Scan.v2/Data/DB_Table/'
-    DB_Path = "/lwork01/yklee/DB_Table/"
-    BB_ID_dic = load_BBID()
+    DB_Path='/ssd/swshin/1D_Scan.v2/Data/DB_Table/'
+    #DB_Path = "/lwork01/yklee/DB_Table/"
+    #BB_ID_dic = load_BBID()
     #global BB_ID_dic
 
     # MW of template
@@ -2924,9 +2620,9 @@ def Extract_ADC():
 
     # Extract Backbone from input files
     print 'Starting ZINC-ADC...'
-    split_BB_list(iPath,BB_ID_dic)
+    #split_BB_list(iPath,BB_ID_dic)
     if_list=glob.glob(iPath+'*.smi')
-    #if_list = glob.glob(iPath + "STB_BB_1608376.smi")
+    #if_list = glob.glob(iPath + "P1090.smi")
     if_list.sort()
 
     # Check if there exists input files
@@ -2941,17 +2637,18 @@ def Extract_ADC():
     alp = 0
     #OK_flag=0
     # For one input
-    out_file = "./Data/ADC_Output/Out_Summary.csv"
+    out_file = "./Data/ADC_Output/Out_Summary.ZINC_Seed.csv"
     """
     if not os.path.exists(out_file):
         pass
     else:
         os.remove(out_file)"""
-    out_file2 = "./Data/ADC_Output/Error_SMILES.csv"
+    out_file2 = "./Data/ADC_Output/Error_SMILES.ZINC_Seed.csv"
 
-    
     # ############################################################################
     for afile in if_list:
+        if alp == 100:
+            break
         alp += 1
         M_MW = 0.075
         print(bcolors.WARNING + "Processing : %s - %d/%d \n"%(afile,alp,len(if_list)) + bcolors.ENDC)
@@ -3031,17 +2728,12 @@ def Extract_ADC():
         else:
             print(bcolors.WARNING + '\nnTotal Num. of candidate ligand for '+afile+': '+str(len(re_list)) + bcolors.ENDC)
             #ZIDs,zdf = BB_Align_Class_Search(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff) # from MD_BA_class2
-			#	print(len(t_idset))
             ZIDs,zdf = BB_Purch_Search(aBB,file_name,re_list)
             ttmp_df = zdf
-            #if zdf.empty:
-            #    ttmp_df = pd.DataFrame()
-            #else:
-            #    ttmp_df = Write_Out_Summary(file_name,aBB,zdf) # from MD_BA_class2
         #sum_df.append(ttmp_df)
         if ttmp_df.empty:
             with open(out_file2,"a") as W:
-                W.write(asmi + '\n')
+                W.write(afile + "\t" + asmi + '\n')
         if not os.path.exists(out_file):
             ttmp_df.to_csv(out_file,index=False,mode="w")
         else:
@@ -3097,35 +2789,12 @@ def BB_Align_Class_Search(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff): # from MD_B
         zzids = list(zzids)
 
         return zzids,ddf
-def BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff):
-	didi = {}
-	smis = []
-	zids = set(ZIDs)
-	in_ID = file_name
-	asmi = aBB
-	for i,j in zip(re_list,range(len(re_list))):
-		didi[str(j)] = i
-	Align_DF = AlignM3D(in_ID,asmi,didi.keys(),didi.values())
-	for i in Align_DF["Query"]:
-		smis.append(didi[i])
-	Align_DF["SMILES"] = smis
-	Align_DF2 = Align_DF[Align_DF["PCScore"] >= 0.8] # Backbone PCScore Cutoff
-	
-	Align_DF2.to_csv("./Data/ADC_Output/" + in_ID + ".total.csv",index=False)
-	zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
-	if zzids is None:
-		return
-	else:
-		zzids = list(zzids)
-		return zzids,ddf
-	
-	
 
 def BB_Purch_Search(aBB,file_name,re_list):
-	######################################
-	# Bio Active Backbone Analysis Tools #
-	######################################
+
 	id_BB = {}
+	t_list = []
+	t_df = pd.DataFrame()
 	for bb in re_list:
 		idid = []
 		Fetch_BB_IDs(bb,idid,id_BB,DB_Path)
@@ -3144,7 +2813,8 @@ def BB_Purch_Search(aBB,file_name,re_list):
 				t_df = pd.merge(cp_df,purch_df)
 				t_df["File_Name"] = [file_name]
 				t_df["Backbone"] = [aBB]
-				t_df = t_df[["File_Name","ZID","SMILES","Backbone","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","Purchasability"]]
+				t_df["N.of.Backbones"] = [len(re_list)]
+				t_df = t_df[["File_Name","ZID","SMILES","Backbone","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","Purchasability","N.of.Backbones"]]
 				return t_list,t_df
 	return t_list,t_df
 
@@ -3295,8 +2965,7 @@ def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
     print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
     return Re_Zid_list,t_mw
 
-#def T15_Class_Search_Type2(afile,TR_MW,M_MW,MW_Index_list):
-def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
+def T15_Class_Search_Type2(afile,TR_MW,M_MW,MW_Index_list):
 
 
     Re_ID_List=[]
@@ -3443,104 +3112,6 @@ def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
     Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
     return Re_Zid_list,t_mw
 
-def T15_query_parameters(ainput,TR_MW,mw_percent):
-	Scaffold = ainput[0]
-	BB = ainput[1]
-	Num_Brench = ainput[2]
-	InputCP = Extract_CP(Scaffold)
-	# Count Total Ring
-	try :
-		pmol = readstring("smi",BB)
-	except:
-		print("Pybel Reading Error")
-	list_ring = pmol.sssr
-	num_ring = len(list_ring)
-	
-	Total_Ring = num_ring + Num_Brench
-	# Calculate MW
-	S_MW = InputCP["MW"]
-	IMW = (TR_MW*Num_Brench) + S_MW
-	per_MW = IMW*np.float64(mw_percent)/np.float64(100)
-	nper_MW = IMW*np.float64(mw_percent-5.0)/np.float64(100)
-	if mw_percent == 7.5:
-		up_MW = IMW + per_MW
-		low_MW = IMW - per_MW
-
-		return IMW,(low_MW,up_MW,Total_Ring)
-	else:
-		uu_MW = IMW + per_MW
-		ul_MW = IMW + nper_MW #per_MW/2.0
-		
-		lu_MW = IMW - nper_MW #per_MW/2.0
-		ll_MW = IMW - per_MW
-		return IMW,(ll_MW,lu_MW,ul_MW,uu_MW,Total_Ring)
-
-	
-def T15_Class_Search_yklee(afile,TR_MW,M_MW):
-	Re_ID_List = []
-	atmp_list = []
-
-	Max_Num = 500
-
-	print("\nFor file : %s"%afile)
-	print("Start Processing T1.5....")
-	
-	asmi = Read_SMILES_FILE(afile)
-	asmi = Make_Canonical_SMI(asmi)
-	if asmi == -1: # pass point 1
-		print("\nIt is Impossible to change Canonical SMILES\n")
-		return -1
-	try: # pass point 2
-		pmol = readstring("smi",asmi)
-		psmi = pmol.write("smi")
-	except:
-		print("\nIt is Impossible to change SMILES\n")
-		return -1
-	pBB = Extract_BB(psmi)
-	
-	InSCF_list = Extract_Inner_Scaffold(pBB)
-	
-	if InSCF_list == -1 or not InSCF_list: # pass point 3
-		print("There is no \"Scaffold\" in the Mol")
-		return -1
-	t_mw = 0
-	manager = Manager()
-	Re_Zid_list = manager.list()
-	n_bbs = 0
-	for alist in InSCF_list:
-		Scaffold = alist[0]
-		break_flag = 0
-		mw_percent = 7.5
-		while break_flag == 0:
-
-			IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
-			
-			#break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
-			retri_list = Fetch_BB_BY_MW_RingNum(entities,DB_Path)
-			if type(retri_list) == int:
-				pass
-			else:
-				print '  --> The number of retrieval: '+str(len(retri_list))
-
-			if retri_list == -1:
-				print '  --> There is no result of query and pass'
-				return -1
-
-			Num_Of_CPU=multiprocessing.cpu_count()
-			pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
-			func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-			pool.map(func,retri_list)
-			pool.close()
-			pool.join()
-			if len(Re_Zid_list) >= 250 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
-				break_flag = 1
-			else:
-				break_flag = 0
-				mw_percent += 5.0
-
-	print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
-	Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
-	return Re_Zid_list
 
 
 def diff(first, second):
@@ -3781,8 +3352,7 @@ def main():
     #print df.head()
     #Extract_CP_SMILES2(i_type,i_content,df)
 
-    #Extract_ADC()
-    yklee_work(3)
+    Extract_ADC()
 
 
     time2=time()

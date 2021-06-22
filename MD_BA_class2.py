@@ -140,7 +140,7 @@ def Fetch_BB_smis_old(smiles,DB_Path):
         exp_df = df1[df1["PCScore"]<0.98]
         out_smiles = df1[df1["PCScore"]>=0.98]["SMILES"] # self Align cutoffa
         return out_smiles
-def Fetch_BB_smis(smiles,DB_Path):
+def Fetch_BB_smis(smiles,smi_set,DB_Path):
 	smis = []
 	didi = {}
 	roro = set()
@@ -168,8 +168,16 @@ def Fetch_BB_smis(smiles,DB_Path):
 	else:
 		for i in rows:
 			for ids in set(unicode.encode(i[0],"utf-8").split(",")):
-				roro.add(ids)
+				if ids in smi_set:
+					pass
+				else:
+					smi_set.add(ids)
+					roro.add(ids)
 		roro = list(roro)
+		if len(roro) == 1:
+			return roro
+		elif not roro:
+			return
 		for i in roro:
 			j = roro.index(i)
 			didi[str(j)] = i
@@ -335,7 +343,7 @@ def Make_BB_Align_result2(file_name,id_set,ncutoff,aBB,DB_Path):
                 print(len(id_set))
         if len(id_set) >= int(ncutoff):
             break
-    if not df_list: return
+    if not df_list: return id_set,pd.DataFrame()
     else: pass
     try:
         fin_df = pd.concat(df_list).drop_duplicates()
