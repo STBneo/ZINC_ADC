@@ -2693,6 +2693,7 @@ def yklee_work(a_type):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
 					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
+		break
 
 def working_a0(asmi,file_name):
 	######################

@@ -3052,7 +3052,7 @@ def Fetch_BB_BY_MW_RingNum_temp(didi,titi,entry,mw_percent,n_bbs,DB_Path):
 	rows = cursorObj.fetchall()
 	n_bbs += int(rows[0][0])
 	print("Length Of Backbone in MW range %.1f%% : %d"%(mw_percent,n_bbs))
-	if n_bbs >= 1000000 or mw_percent >= 1.0:
+	if n_bbs >= 1000000 or mw_percent >= 10.0:
 		if len(entry) == 3:
 			f_entities = entry
 		elif len(entry) == 5:
