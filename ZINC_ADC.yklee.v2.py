@@ -2693,6 +2693,7 @@ def yklee_work(a_type):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
 					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
+		break
 
 def working_a0(asmi,file_name):
 	######################
@@ -2775,7 +2776,7 @@ def working_a2(asmi,file_name,InputCP):
 	df_list2 = []
 	df_list3 = []
 	pur_ls = []
-	idid = []
+	#idid = []
 	t_idset = set()
 	id_BB = {}
 	re_list = []
@@ -2822,15 +2823,16 @@ def working_a2(asmi,file_name,InputCP):
 	fin_df.to_csv(file_name + ".total.csv",index=False)
 	smi_list = fin_df["SMILES"]
 	for smi in smi_list:
+		idid = []
 		pcscore = np.float64(fin_df[fin_df["SMILES"] == smi]["PCScore"][:1])
-		dd = Fetch_BB_smis(smi,DB_Path)
-		for t_smi in dd:
-			if t_smi in t_smiset:
-				pass
-			else:
-				t_smiset.add(t_smi)
+		dd = Fetch_BB_smis(smi,t_smiset,DB_Path)
+		if dd is None:
+			id_df = None
+			pass
+		else:
+			for t_smi in dd:
 				Fetch_BB_IDs(t_smi,idid,id_BB,DB_Path)
-		id_df = Final_Annot(idid,id_BB,pcscore,DB_Path)
+			id_df = Final_Annot(idid,id_BB,pcscore,DB_Path)
 
 		df_list_t.append(id_df)
 		if id_df is None:
