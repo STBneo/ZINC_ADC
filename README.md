@@ -17,3 +17,7 @@ ZINC_ADC
 
 >*working type 3:   
 >   > Extract ZINC ADC   
+
+### Data
+>+Input Path   
+>+Output Path
