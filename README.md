@@ -1,4 +1,4 @@
 # ZINC_ADC
 Project Goal : Findig similarly SMILES by input SMILES
 
-![Alt text](./ZINC_ADC.VS_concept.jpg)
+<img src="./ZINC_ADC.VS_concept.jpg" width="40%" height="30%">
