@@ -20,7 +20,8 @@ ZINC_ADC
 <hr/>
 
 ### Data:    
-+ Input Path :
-+ Output Path :
++ Input Path : ./Data/Input
++ Output Path : ./Data/ADC_Output
 
-### DB Path :
+### Default DB Path :
+* /ssd/swshin/1D_Scan.v2/Data/DB_Table/
