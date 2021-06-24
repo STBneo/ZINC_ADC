@@ -19,5 +19,5 @@ ZINC_ADC
 > Extract ZINC ADC   
 <hr/>
 ### Data   
-+ Input Path   
-+ Output Path   
+* Input Path   
+* Output Path   
