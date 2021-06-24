@@ -45,12 +45,11 @@ from multiprocessing import Process, current_process
 import shutil
 
 #For call user define function
-from MD_Backbone import *
-from MD_DB import *
-from MD_Align import *
-from MD_BA_class2 import *
-from MD_Output import *
-#from BB_yklee import *
+from ADC_tools.MD_Backbone import *
+from ADC_tools.MD_DB import *
+from ADC_tools.MD_Align import *
+from ADC_tools.MD_BA_class2 import *
+from ADC_tools.MD_Output import *
 
 class bcolors:
     HEADER = '\033[95m'
@@ -2596,7 +2595,7 @@ def yklee_work(a_type):
 	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs
 	T1_pcscore_cutoff = 0.98
 	ring_cutoff = 1
-	N_ZIDs_cutoff = 7500 #1500
+	N_ZIDs_cutoff = 10000 #1500
 	global oPath,DB_Path
 	iPath = "./Data/Input/"
 	oPath = "./Data/ADC_Output/Files/"
@@ -2624,7 +2623,7 @@ def yklee_work(a_type):
 	alp = 0
 
 	out_file1 = "./Data/ADC_Output/Out_Summary.csv"
-	out_file2 = "./Data/ADC_Output/Error_SMILES.csv"
+	out_file2 = "./Data/ADC_Output/Error_SMILES.txt"
 	for afile in if_list:
 		alp += 1
 		M_MW = 0.1
@@ -2687,14 +2686,13 @@ def yklee_work(a_type):
 		else:
 			if sum_df.empty:
 				with open(out_file2,"a") as W:
-					W.write(asmi + '\n')
+					W.write(file_name + "\t" + asmi + '\n')
 			else:
 				if not os.path.exists(out_file1):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
 					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
 		break
-
 def working_a0(asmi,file_name):
 	######################
 	# Tier 1 Exact Match #
@@ -2704,31 +2702,19 @@ def working_a0(asmi,file_name):
 	re_list = set()
 	aBB = Extract_BB(asmi)
 	ZIDs = T1_Class_Search(aBB,file_name,m_type=1)
+
 	if ZIDs == -1:
 		return -1
 	else:
-		for zids in ZIDs:
-			tmp_df = Fetch_Purch_Annot(zids,DB_Path)
-		if tmp_df is None:
-			pass
-		elif ''.join(tmp_df["Purchasability"].tolist()) == "Unknown":
-			pass
-		else:
-			tmp_list.append(tmp_df)
-	if not tmp_list:
-		sys.exit(1)
+		tmp_df = pd.DataFrame(ZIDs,columns="ZID")
+		tmp_df["Purchasability"] = ["Purchasable"]
 
-	else:
-		tmp_df = pd.concat(tmp_list)
-		idx = 0
-		for i in tmp_df["ZID"]:
-			Fetch_SMILES_by_ID(i,id_smi,DB_Path)
-		for i in list(set(id_smi.values())):
-			re_list.add(Extract_BB(i))
+	for i in tmp_df["ZID"]:
+		id_smi = Fetch_SMILES_by_ID(i,id_smi,DB_Path)
+	for i in list(set(id_smi.values())):
+		re_list.add(Extract_BB(i)) # Backbone list
 
-	re_list = list(re_list)
-	return re_list
-	
+	return list(re_list)
 def working_a1(asmi,file_name,afile):
 	######################################
 	# Tier 1.5 Match , Inter-Ring Search #
@@ -2801,7 +2787,7 @@ def working_a2(asmi,file_name,InputCP):
 	n_bbs = 0
 	while break_flag == 0:
 		query_entities = BB_Query_parameters(asmi,mw_percent)
-		break_flag,n_bbs = Fetch_BB_BY_MW_RingNum_temp(BB_dic,Osmi_dic,query_entities,mw_percent,n_bbs,DB_Path)
+		break_flag,n_bbs = Fetch_PBB_BY_MW_RingNum_temp(BB_dic,Osmi_dic,query_entities,mw_percent,n_bbs,DB_Path)
 		mw_percent += 1.0
 	lenid = len(BB_dic)//9
 
@@ -2821,8 +2807,8 @@ def working_a2(asmi,file_name,InputCP):
 		os.remove(i)
 	fin_df = pd.concat(df_list).sort_values(by="PCScore",ascending=False)
 	fin_df.to_csv(file_name + ".total.csv",index=False)
-	smi_list = fin_df["SMILES"]
-	for smi in smi_list:
+	smi_list = fin_df["SMILES"].drop_duplicates()
+	for smi in smi_list: 
 		idid = []
 		pcscore = np.float64(fin_df[fin_df["SMILES"] == smi]["PCScore"][:1])
 		dd = Fetch_BB_smis(smi,t_smiset,DB_Path)
@@ -2839,7 +2825,7 @@ def working_a2(asmi,file_name,InputCP):
 			pass
 		else:
 			t_idset = t_idset | set(id_df["ZID"].tolist())
-			print(len(t_idset))
+		print(len(t_idset))
 		if len(t_idset) >= int(N_ZIDs_cutoff):
 			break
 		else:
@@ -2855,10 +2841,12 @@ def working_a2(asmi,file_name,InputCP):
 	fin_df = pd.concat([wsmi_df,fin_df])
 	fin_df = fin_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability"]]
 	fin_df.reset_index(drop=True,inplace=True)
-	fin_df = fin_df[fin_df["Z_PCScore"] > 0.75 ] # Z PCScore Cutoff
-	fin_df.to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
+	fin_df1 = fin_df[fin_df["BB_PCScore"] >= 0.70] # BB PCScore Cutoff
+	fin_df1 = fin_df1[fin_df1["Z_PCScore"] > 0.70 ] # Z PCScore Cutoff
+	fin_df1.to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
+	fin_df.to_csv(out_csv_path + file_name + ".all_out.csv",index=False)
 
-	return fin_df
+	return fin_df1
 def working_ZADC(asmi,file_name,afile,InputCP):
 	ZIDs = []
 	aBB = Extract_BB(asmi)
@@ -3517,7 +3505,7 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 			IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
 			
 			#break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
-			retri_list = Fetch_BB_BY_MW_RingNum(entities,DB_Path)
+			retri_list = Fetch_PBB_BY_MW_RingNum(entities,DB_Path)
 			if type(retri_list) == int:
 				pass
 			else:
@@ -3589,7 +3577,8 @@ def Search_ASMILES(asmi,m_type):
 
         T_ZIDs_BB=set()
 
-        re=Fetch_BB(asmi,DB_Path)
+        #re=Fetch_BB(asmi,DB_Path)
+        re = Fetch_PBB(asmi,DB_Path)
         #print re
         if re is None:
             print("SMILES %s , There is no result for extract BB matching")
@@ -3606,7 +3595,8 @@ def Search_ASMILES(asmi,m_type):
         #print cp
 
         entry=(cp['MW'],cp['LogP'],cp['HBA'],cp['HBD'],cp['TPSA'],cp['Ring'])
-        Same_CPs = Fetch_BB_CP(entry,DB_Path)
+        #Same_CPs = Fetch_BB_CP(entry,DB_Path)
+        Same_CPs = Fetch_PBB_CP(entry,DB_Path)
         print  ' --> Same_CPs num: ',len(Same_CPs)
 
         # Extract smiles for same CP
