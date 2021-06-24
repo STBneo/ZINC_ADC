@@ -1,4 +1,4 @@
-# ZINC_ADC
+ZINC_ADC
 ==========
 Project Goal : Findig similarly SMILES by input SMILES
 
