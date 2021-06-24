@@ -7,10 +7,10 @@ ZINC_ADC
 
 ## Help:
 >*working type 0:   
->> Tier 1 Exact Match   
+>   > Tier 1 Exact Match   
 >*working type 1:   
->> Tier 1.5 Match   
+>   > Tier 1.5 Match   
 >*working type 2:   
->> Tier 1.6 Match   
+>   > Tier 1.6 Match   
 >*working type 3:   
->> Extract ZINC ADC   
+>   > Extract ZINC ADC   
