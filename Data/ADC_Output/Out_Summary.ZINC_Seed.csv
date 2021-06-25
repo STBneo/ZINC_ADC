@@ -1,2 +1,0 @@
-File_Name,ZID,SMILES,Backbone,MW,LogP,TPSA,RotatableB,HBD,HBA,Ring,Total_Charge,HeavyAtoms,CarBonAtoms,HeteroAtoms,Lipinski_Violation,VeBer_Violation,Egan_Violation,Toxicity,Purchasability,N.of.Backbones
-S4794,ZINC000254566707,C[C@@]12CCC[C@@H]1[C@H]1CC[C@H]3CC(=O)C(=NO)C[C@]3(C)[C@@H]1CC2,C2C(=O)CC3CCC1C4CCCC4(CCC1C3(C2)),303.43905999999987,4.4284,49.66,0,1,7,4,0,22,19,3,-1,Unknown,Unknown,Unknown,Purchasable,15
