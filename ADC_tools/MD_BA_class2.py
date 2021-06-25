@@ -375,12 +375,12 @@ def Make_BB_Align_result2(file_name,id_set,ncutoff,aBB,DB_Path):
     print("Number Of Extracting SDF Files : " + str(len(fin_df["ZID"].drop_duplicates())-1))
 
     os.chdir(sdf_out_path)
-
+    """
     pool = multiprocessing.Pool(Ncpu-2)
     func = partial(SDF_load_MainS,DB_Path=DB_Path)
     pool.map(func,fin_df["ZID"])
     pool.close()
-    pool.join()
+    pool.join()"""
 
     os.chdir('../../../')
     return id_set,fin_df1

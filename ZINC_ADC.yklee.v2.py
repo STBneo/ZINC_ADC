@@ -2855,6 +2855,7 @@ def working_a2(asmi,file_name,InputCP):
 
 	return fin_df1
 def working_ZADC(asmi,file_name,afile,InputCP):
+	fin_df = pd.DataFrame()
 	ZIDs = []
 	aBB = Extract_BB(asmi)
 	re_list = working_a0(aBB,file_name)
