@@ -2592,7 +2592,7 @@ def yklee_work_help():
 	#################################################################
 """)
 def yklee_work(a_type):
-	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs
+	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs,out_csv_path
 	T1_pcscore_cutoff = 0.98
 	ring_cutoff = 1
 	N_ZIDs_cutoff = 10000 #1500
@@ -2600,6 +2600,7 @@ def yklee_work(a_type):
 	iPath = "./Data/Input/"
 	oPath = "./Data/ADC_Output/Files/"
 	rei_img_Path = "./Data/Re_Input/IMG/"
+	out_csv_path = "./Data/ADC_Output/"
 
 	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
 	
@@ -2692,7 +2693,6 @@ def yklee_work(a_type):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
 					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
-		break
 def working_a0(asmi,file_name):
 	######################
 	# Tier 1 Exact Match #
@@ -2767,6 +2767,7 @@ def working_a2(asmi,file_name,InputCP):
 	id_BB = {}
 	re_list = []
 	t_smiset = set()
+	tier_list = []
 
 	BB_dic = {}
 	Osmi_dic = {}
@@ -2806,7 +2807,8 @@ def working_a2(asmi,file_name,InputCP):
 		df_list.append(pd.read_csv(i))
 		os.remove(i)
 	fin_df = pd.concat(df_list).sort_values(by="PCScore",ascending=False)
-	fin_df.to_csv(file_name + ".total.csv",index=False)
+	fin_df.to_csv(out_csv_path + file_name + ".BBAlign.total.csv",index=False) # Extract Backbone Align score file
+
 	smi_list = fin_df["SMILES"].drop_duplicates()
 	for smi in smi_list: 
 		idid = []
@@ -2838,13 +2840,15 @@ def working_a2(asmi,file_name,InputCP):
 
 	za_df = AlignM3D(file_name,asmi,fin_df["ZID"],fin_df["SMILES"]).rename(columns={"Query":"ZID","PCScore":"Z_PCScore"}).drop(["Template"],axis=1)
 	fin_df = reduce(lambda x,y : pd.merge(x,y,on="ZID"),[fin_df,za_df]).rename(columns={"PCScore":"BB_PCScore"}).sort_values(by="Z_PCScore",ascending=False)
+	for i in fin_df["ZID"]:
+		tier_list.append("T 1.6 Backbone Alignment Search")
+	fin_df["Tier"] = tier_list
 	fin_df = pd.concat([wsmi_df,fin_df])
-	fin_df = fin_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability"]]
+	fin_df = fin_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
 	fin_df.reset_index(drop=True,inplace=True)
-	fin_df1 = fin_df[fin_df["BB_PCScore"] >= 0.70] # BB PCScore Cutoff
-	fin_df1 = fin_df1[fin_df1["Z_PCScore"] > 0.70 ] # Z PCScore Cutoff
-	fin_df1.to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
-	fin_df.to_csv(out_csv_path + file_name + ".all_out.csv",index=False)
+	fin_df1 = fin_df[fin_df["BB_PCScore"] >= 0.70][fin_df["Z_PCScore"] >= 0.70] # BB PCScore Cutoff & Z PCScore Cutoff
+	pd.concat([wsmi_df,fin_df1]).to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
+	pd.concat([wsmi_df,fin_df]).to_csv(out_csv_path + file_name + ".all_out.csv",index=False)
 
 	return fin_df1
 def working_ZADC(asmi,file_name,afile,InputCP):
@@ -2864,13 +2868,17 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 
 	ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
 	if len(ZIDs) >= N_ZIDs_cutoff:
-		return zdf
+		print(zdf)
+		pass
 	else:
 		fin_df = working_a2(asmi,file_name,InputCP)
 		tfin_df = pd.concat([zdf,fin_df]).drop_duplicates().reset_index(drop=True)
 		zdf = tfin_df
 		print(zdf)
-		return zdf
+	zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
+	zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
+	zdf.to_csv(out_csv_path + file_name + ".ZADC.csv",index=False)
+	return zdf
 	
 
 
