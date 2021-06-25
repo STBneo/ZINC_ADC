@@ -21,7 +21,7 @@ ZINC_ADC
 
 ### Data:    
 + **Input Path** : ./Data/Input
-++   
+  +
 + **Output Path** : ./Data/ADC_Output
 
 ### Default DB Path :
