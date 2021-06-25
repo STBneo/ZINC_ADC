@@ -23,7 +23,7 @@ ZINC_ADC
 + **Input Path** : ./Data/Input   
   + SMILES string
 + **Output Path** : ./Data/ADC_Output   
-   * 
+  + 
 
 ### Default DB Path :
 * /ssd/swshin/1D_Scan.v2/Data/DB_Table/
