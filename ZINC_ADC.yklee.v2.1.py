@@ -2696,7 +2696,6 @@ def yklee_work(a_type):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
 					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
-		break
 def working_a0(asmi,file_name):
 	######################
 	# Tier 1 Exact Match #
@@ -2866,21 +2865,25 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	re_list1 = working_a1(asmi,file_name,afile)
 	if re_list1 == -1: # Check inner-Scaffold
 		fin_df = working_a2(asmi,file_name,InputCP) # if mol don't have inner-Scaffold,it do Backbone Align
-		return fin_df
+		#return fin_df
 	else:
 		re_list = re_list|set(re_list1)
-
-	ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
-	if len(ZIDs) >= N_ZIDs_cutoff:
-		print(zdf)
-		pass
+	if not fin_df.empty:
+		zdf = fin_df
 	else:
-		fin_df = working_a2(asmi,file_name,InputCP)
-		tfin_df = pd.concat([zdf,fin_df]).drop_duplicates().reset_index(drop=True)
-		zdf = tfin_df
-		print(zdf)
+		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
+		if len(ZIDs) >= N_ZIDs_cutoff:
+			print(zdf)
+			pass
+		else:
+			fin_df = working_a2(asmi,file_name,InputCP)
+			tfin_df = pd.concat([zdf,fin_df]).drop_duplicates().reset_index(drop=True)
+			zdf = tfin_df
+			print(zdf)
+	
 	zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
 	zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
+	print(zdf)
 	zdf.to_csv(out_csv_path + file_name + ".ZADC.csv",index=False)
 	return zdf
 	
