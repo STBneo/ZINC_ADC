@@ -2605,12 +2605,15 @@ def yklee_work(a_type):
 	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
 	
 	TR_MW = 38.0
-
-	shutil.rmtree(oPath)
-	os.mkdir(oPath)
+	if os.path.exists(oPath):
+		pass
+	else:
+		os.makedirs(oPath)
 	
-	shutil.rmtree(rei_img_Path)
-	os.mkdir(rei_img_Path)
+	if os.path.exists(rei_img_Path):
+		pass
+	else:
+		os.makedirs(rei_img_Path)
 
 	if_list = sorted(glob.glob(iPath + "*.smi"))
 	if len(if_list) == 0:
