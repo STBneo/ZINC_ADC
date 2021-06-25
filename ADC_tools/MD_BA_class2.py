@@ -324,7 +324,7 @@ def Make_BB_Align_result2(file_name,id_set,ncutoff,aBB,DB_Path):
     wsmi_df["Backbone"] = BB_in
 
     df = pd.read_csv(infile)
-    smi_list = df["SMILES"]
+    smi_list = df["SMILES"].drop_duplicates()
 
     if os.path.exists(sdf_out_path):
         os.system("rm %s/*"%sdf_out_path)
@@ -362,9 +362,13 @@ def Make_BB_Align_result2(file_name,id_set,ncutoff,aBB,DB_Path):
     fin_score = AlignM3D(file_name,wsmi,id_smi.keys(),id_smi.values())
     fin_score.rename(columns={"Query":"ZID","PCScore":"Z_PCScore"},inplace=True)
     fin_df1 = pd.merge(fin_df,fin_score[["ZID","Z_PCScore"]],on="ZID").sort_values(by="Z_PCScore",ascending=False).rename(columns={"PCScore":"BB_PCScore"})
+    tier_list = [] 
+    for i in fin_df1["ZID"]:
+        tier_list.append("T 1.5 Inner-Scaffold Search")
+    fin_df1["Tier"] = tier_list
     fin_df1 = pd.concat([wsmi_df,fin_df1])
 	
-    fin_df1 = fin_df1[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Backbone",'Purchasability']]
+    fin_df1 = fin_df1[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Backbone",'Purchasability',"Tier"]]
 	
     fin_df1.to_csv(output_path + file_name + '_' + str(ncutoff) + '.csv',index=False)
 	
