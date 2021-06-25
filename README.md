@@ -20,7 +20,7 @@ ZINC_ADC
 <hr/>
 
 ### Data:    
-+ **Input Path** : ./Data/Input
++ **Input Path** : ./Data/Input   
   +
 + **Output Path** : ./Data/ADC_Output
 
