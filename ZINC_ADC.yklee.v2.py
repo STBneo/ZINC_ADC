@@ -2602,7 +2602,8 @@ def yklee_work(a_type):
 	rei_img_Path = "./Data/Re_Input/IMG/"
 	out_csv_path = "./Data/ADC_Output/"
 
-	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
+	#DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
+	DB_Path = "/lwork02/yklee/DB_Table/"
 	
 	TR_MW = 38.0
 	if os.path.exists(oPath):
@@ -2858,6 +2859,8 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	fin_df = pd.DataFrame()
 	ZIDs = []
 	aBB = Extract_BB(asmi)
+	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
+	wsmi_df["ZID"] = "* " + file_name
 	re_list = working_a0(aBB,file_name)
 	if re_list == -1:
 		re_list = set()
@@ -2870,7 +2873,7 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	else:
 		re_list = re_list|set(re_list1)
 	if not fin_df.empty:
-		zdf = fin_df
+		zdf = pd.concat([wsmi_df,fin_df)
 	else:
 		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
 		if len(ZIDs) >= N_ZIDs_cutoff:
@@ -2878,7 +2881,7 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 			pass
 		else:
 			fin_df = working_a2(asmi,file_name,InputCP)
-			tfin_df = pd.concat([zdf,fin_df]).drop_duplicates().reset_index(drop=True)
+			tfin_df = pd.concat([wsmi_df,zdf,fin_df]).drop_duplicates().reset_index(drop=True)
 			zdf = tfin_df
 			print(zdf)
 	
