@@ -2873,7 +2873,7 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	else:
 		re_list = re_list|set(re_list1)
 	if not fin_df.empty:
-		zdf = pd.concat([wsmi_df,fin_df)
+		zdf = pd.concat([wsmi_df,fin_df])
 	else:
 		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
 		if len(ZIDs) >= N_ZIDs_cutoff:
