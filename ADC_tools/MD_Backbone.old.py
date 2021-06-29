@@ -3344,7 +3344,7 @@ def Extract_Inner_Scaffold(asmi):
         #print 'brench:',brench 
 
         try:
-            #Chem.SanitizeMol(mw) 
+            Chem.SanitizeMol(mw) 
             asmi = Chem.MolToSmiles(mw)
             #print asmi
             list_re_tmp.append(asmi)
