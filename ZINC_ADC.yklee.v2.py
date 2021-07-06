@@ -1,13 +1,6 @@
-import glob
-import sys,os
+import glob,sys,os,random,argparse,subprocess,pickle
 from time import time
-import argparse
-import glob
-import os
-import subprocess
-import pickle
 from datetime import datetime
-from os import path
 import random
 from operator import itemgetter
 
@@ -26,8 +19,18 @@ import copy
 import re
 import pandas as pd 
 import traceback
-
+import matplotlib
+import matplotlib.pyplot as plt
+# For background plotting
+matplotlib.use("Agg")
+plt.switch_backend("agg")
 from pybel import *
+
+# For Clustering
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn.manifold import spectral_embedding
+from scipy.cluster.hierarchy import dendrogram,linkage
 
 # For Database
 import sqlite3
@@ -50,6 +53,7 @@ from ADC_tools.MD_DB import *
 from ADC_tools.MD_Align import *
 from ADC_tools.MD_BA_class2 import *
 from ADC_tools.MD_Output import *
+from ADC_tools.MD_Cluster import Calc_Dist,Dendrogram_Plot,DBSCAN_Plot
 
 class bcolors:
     HEADER = '\033[95m'
@@ -2595,15 +2599,15 @@ def yklee_work(a_type):
 	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs,out_csv_path
 	T1_pcscore_cutoff = 0.98
 	ring_cutoff = 1
-	N_ZIDs_cutoff = 10000 #1500
+	N_ZIDs_cutoff = 1000 #10000 #1500
 	global oPath,DB_Path
 	iPath = "./Data/Input/"
 	oPath = "./Data/ADC_Output/Files/"
 	rei_img_Path = "./Data/Re_Input/IMG/"
 	out_csv_path = "./Data/ADC_Output/"
 
-	#DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
-	DB_Path = "/lwork02/yklee/DB_Table/"
+	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
+	#DB_Path = "/lwork02/yklee/DB_Table/"
 	
 	TR_MW = 38.0
 	if os.path.exists(oPath):
@@ -2678,10 +2682,12 @@ def yklee_work(a_type):
 					sum_df = pd.DataFrame()
 				else:
 					sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),zdf)
+					dist_df = Calc_Dist(zdf)
 			#elif a_type == 3 and type(total_df) == type(pd.DataFrame()):
 			
 			else:
 				sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),total_df)
+				dist_df = Calc_Dist(total_df)
 
 		################
 		# Make Summary #
@@ -2693,6 +2699,7 @@ def yklee_work(a_type):
 				with open(out_file2,"a") as W:
 					W.write(file_name + "\t" + asmi + '\n')
 			else:
+				IMG_Plot(rei_img_Path,file_name,dist_df)
 				if not os.path.exists(out_file1):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
@@ -2890,7 +2897,22 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	print(zdf)
 	zdf.to_csv(out_csv_path + file_name + ".ZADC.csv",index=False)
 	return zdf
-	
+
+
+def IMG_Plot(img_path,fn,X):
+	X_cp = pd.DataFrame(spectral_embedding(X,n_components=2)).values
+	X_cp = StandardScaler().fit_transform(X_cp)
+
+	fig = plt.figure(figsize=(30,15))
+	ax1 = fig.add_subplot(1,2,1)
+	ax2 = fig.add_subplot(1,2,2)
+
+	Dendrogram_Plot(fn,X_cp,ax1)
+	DBSCAN_Plot(fn,X_cp,ax2)
+
+	fig.tight_layout()
+
+	fig.savefig("%s/%s.cluster.png"%(img_path,fn))
 
 
 def Extract_ADC():
