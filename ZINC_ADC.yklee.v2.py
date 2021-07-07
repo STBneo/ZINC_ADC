@@ -2682,12 +2682,12 @@ def yklee_work(a_type):
 					sum_df = pd.DataFrame()
 				else:
 					sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),zdf)
-					dist_df = Calc_Dist(zdf)
+					dist_df = Calc_Dist(zdf["ZID"],zdf["SMILES"])
 			#elif a_type == 3 and type(total_df) == type(pd.DataFrame()):
 			
 			else:
 				sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),total_df)
-				dist_df = Calc_Dist(total_df)
+				dist_df = Calc_Dist(total_df["ZID"],total_df["SMILES"])
 
 		################
 		# Make Summary #
