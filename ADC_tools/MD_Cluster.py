@@ -4,7 +4,7 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import os,sys,glob,random,itertools,multiprocessing
 import subprocess
-
+import networkx as nx
 from functools import partial
 from time import time
 from multiprocessing import Manager,Process
@@ -163,12 +163,10 @@ def Dendrogram_Plot(a,X_cp,aa1):
 
 	aa1.set_title("Dendrogram: %s"%a,fontsize=30)
 	aa1.set_yticks(np.arange(0,50,5))
-	aa1.grid(True,axis="y",linestyle="--")
-
 
 def DBSCAN_Plot(a,X_cp,aa1):
 
-	clustering = DBSCAN(eps=0.2,min_samples=10).fit(X_cp)
+	clustering = DBSCAN(eps=0.1,min_samples=4).fit(X_cp)
 
 	labels = clustering.labels_
 	n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
@@ -192,7 +190,6 @@ def DBSCAN_Plot(a,X_cp,aa1):
 
 	aa1.set_xlabel("Estimated number of clusters: %d"%n_clusters_,fontsize=20.0)
 	aa1.set_title("Clustering by DBSCAN: %s"%a,fontsize=30)
-	aa1.grid(True)
 
 def Kmeans_Plot(a,X_cp,aa1):
 	in_cluster = 5
@@ -211,7 +208,6 @@ def Kmeans_Plot(a,X_cp,aa1):
 
 	aa1.set_xlabel("Clusters: %d"%in_cluster,fontsize=20.0)
 	aa1.set_title("Clustering by KMeans: %s"%a,fontsize=30.0)
-	aa1.grid(True)
 def Make_ZID_dic(df,a):
 	didi = {}
 	if len(df) <= a:
@@ -222,8 +218,8 @@ def Make_ZID_dic(df,a):
 	Main_SMI_list = []
 	Main_ID_list = []
 	for idx,line in df.iterrows():
-		zid = line["ZID"]
-		smi = line["SMILES"]
+		zid = line[0]
+		smi = line[1]
 		didi[zid] = smi
 
 	for i in random.sample(didi,n_samples):
@@ -232,17 +228,31 @@ def Make_ZID_dic(df,a):
 
 	return Main_ID_list,Main_SMI_list,didi
 
-def Calc_Dist(df):
-	df = df[1:]
-	a = 1000 # N.of samples
+def Calc_Dist(aa,bb,a):
+	df = pd.DataFrame([aa,bb]).T
+	df.columns = [0,1]
+	print(df)
 	Main_ID_list,Main_SMI_list,ZID_Dic = Make_ZID_dic(df,a)
 	Dis_Mat = Make_Distance_Mat(Main_ID_list,Main_SMI_list,ZID_Dic)
+
 
 	return Dis_Mat
 if __name__ == "__main__":
 	inf = sys.argv[1]
-	X = np.load(inf) 
-	X_cp = pd.DataFrame(spectral_embedding(X,n_components=2)).values
+	fn = os.path.basename(inf).split(".")[0]
+	df = pd.read_csv(inf)[1:]
+	aa = df["ZID"]
+	bb = df["SMILES"]
+	inf = Calc_Dist(aa,bb,1000)
+	np.save(fn + ".Dist_Mx.save.npy",inf)
+	X = np.load(fn + ".Dist_Mx.save.npy") 
+	X = np.ones((len(X),len(X))) - X
+
+	G = nx.from_numpy_matrix(X)
+
+	pos = nx.spring_layout(G,seed=1)
+
+	X_cp = pd.DataFrame(pos.values())
 
 	X_cp = StandardScaler().fit_transform(X_cp)
 
@@ -250,7 +260,6 @@ if __name__ == "__main__":
 	ax1 = fig.add_subplot(1,2,1)
 	ax2 = fig.add_subplot(1,2,2)
 
-	fn = os.path.basename(inf).split(".")[0]
 
 	Dendrogram_Plot(fn,X_cp,ax1)
 	DBSCAN_Plot(fn,X_cp,ax2)
