@@ -12,18 +12,25 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram,linkage
 from sklearn.manifold import spectral_embedding
+
 import matplotlib
+import argparse
+
+
 matplotlib.use("Agg")
 plt.switch_backend("agg")
 
+
 def Check_LSAlign():
-	if not os.path.exists('./ADC_tools/LSalign'):
+	if not os.path.exists('./LSalign'):
 		print(" This python program needs \'LSalign\'.")
-		print(" Move the \'LSalign\' program at ADC_tools folder and re-excute this program. ")
+		print(" Rerun this program. ")
 
 		return -1
 	else:
 		return 1
+
+
 
 def Run_LSAlign(Re_list,ZID_Dic,list_pairs,apair):
 
@@ -56,7 +63,8 @@ def Run_LSAlign(Re_list,ZID_Dic,list_pairs,apair):
 	process = subprocess.Popen(arg, shell=True, stdout=FNULL,stderr=subprocess.STDOUT)
 	process.wait()
 
-	arg='./ADC_tools/LSalign '+q_fname+' '+t_fname
+	#arg='./ADC_tools/LSalign '+q_fname+' '+t_fname
+	arg='./LSalign '+q_fname+' '+t_fname
     #arg='./LSalign '+q_fname+' '+t_fname+' -d0 0.1'
 	align = subprocess.Popen(arg, shell=True, stdout=subprocess.PIPE)
 	lines = align.stdout.readlines()
@@ -104,6 +112,9 @@ def Run_LSAlign(Re_list,ZID_Dic,list_pairs,apair):
 	Re_list.append(tmp_list)
 
 	return
+
+
+
 def Making_Pair(Main_SMI_list):
 
 	tmp_list=[]
@@ -123,30 +134,36 @@ def Making_Pair(Main_SMI_list):
 	return list(re_list_set)
 
 
+
 def Make_Distance_Mat(Main_ID_list,Main_SMI_list,ZID_Dic):
 
-	time_sp1=time()
-	print '\nStart to making the distance matrix using multiprocessing'
+    if Check_LSAlign()==-1:
+        sys.exit(1)
+    
+    time_sp1=time()
+    print '\nStart to making the distance matrix using multiprocessing'
+    
+    pcs_m = np.zeros((len(Main_SMI_list),len(Main_SMI_list)))
+    list_pairs = Making_Pair(Main_ID_list)
+    
+    Re_list=Manager().list()
+    
+    n_cpu=multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes=(n_cpu-1))
+    func=partial(Run_LSAlign,Re_list,ZID_Dic,list_pairs)
+    pool.map(func,list_pairs)
+    pool.close()
+    pool.join()
 
-	pcs_m = np.zeros((len(Main_SMI_list),len(Main_SMI_list)))
-	list_pairs = Making_Pair(Main_ID_list)
+    Re_list = list(Re_list)
+    #print(Re_list)
 
-	Re_list=Manager().list()
-
-	n_cpu=multiprocessing.cpu_count()
-	pool = multiprocessing.Pool(processes=(n_cpu-1))
-	func=partial(Run_LSAlign,Re_list,ZID_Dic,list_pairs)
-	pool.map(func,list_pairs)
-	pool.close()
-	pool.join()
-
-	idx=0
-	for ele in Re_list:
-		x,y =  Main_ID_list.index(ele[0]),Main_ID_list.index(ele[1])
-		pcs_m[x][y]=float(ele[2])
-		pcs_m[y][x]=float(ele[2])
-		pcs_m[x][x]=1.0
-		pcs_m[y][y]=1.0
+    for ele in Re_list:
+        x,y =  Main_ID_list.index(ele[0]),Main_ID_list.index(ele[1])
+        pcs_m[x][y]=float(ele[2])
+        pcs_m[y][x]=float(ele[2])
+        pcs_m[x][x]=1.0
+        pcs_m[y][y]=1.0
 
 	print ('  -> Done')
 
@@ -154,6 +171,45 @@ def Make_Distance_Mat(Main_ID_list,Main_SMI_list,ZID_Dic):
 	print '  -> Processing time to make distance matrix: '+str(time_sp2-time_sp1)+'s for '+str(len(Main_ID_list))+' ZIDs'
 
 	return pcs_m
+
+
+
+def Make_ZID_Dic(Main_ID_list,Main_SMI_list):
+
+    tmp_Dic = {}
+
+    idx=0
+    for aID in Main_ID_list:
+        tmp_Dic[aID] = Main_SMI_list[idx]
+        idx+=1
+
+    return tmp_Dic
+
+
+
+def Start_Make_DisMat(Main_ID_list,Main_SMI_list,Mat_name,n_sam,rebuild):
+
+    np_name=Mat_name+'.Dis_matrix.npy'
+
+    if rebuild == 'y':
+        ZID_Dic = Make_ZID_Dic(Main_ID_list,Main_SMI_list)
+        #Dis_Mat = Make_Distance_Mat(Main_ID_list,Main_SMI_list,ZID_Dic)
+        Dis_Mat = Make_Distance_Mat(Main_ID_list[0:n_sam],Main_SMI_list[0:n_sam],ZID_Dic)
+        np.save('./'+np_name,Dis_Mat)
+
+    if rebuild == 'n':
+        if os.path.exists('./'+np_name):
+            print ('Loading the distance matrix file\n')
+            Dis_Mat = np.load('./'+np_name)
+        else:
+            print ('There is no Distance matrix file.\n Make Distance matrix file first')
+            sys.exit(1)
+
+    return Dis_Mat
+
+
+
+##########################################################################
 
 def Dendrogram_Plot(a,X_cp,aa1):
 	
@@ -163,10 +219,55 @@ def Dendrogram_Plot(a,X_cp,aa1):
 
 	aa1.set_title("Dendrogram: %s"%a,fontsize=30)
 	aa1.set_yticks(np.arange(0,50,5))
+	#aa1.grid(True,axis="y",linestyle="--")
 
-def DBSCAN_Plot(a,X_cp,aa1):
+def Activate_DBSCAN(a,X_cp,nlist,slist,eps,min_s):
+	xs = []
+	ys = []
+	n_cl = []
 
-	clustering = DBSCAN(eps=0.1,min_samples=4).fit(X_cp)
+	temp_df = pd.DataFrame()
+	finl_df = {}
+	XY = pd.DataFrame()
+
+	XY["X"] = X_cp[:,0]
+	XY["Y"] = X_cp[:,1]
+	XY["IDs"] = nlist
+	XY["Scores"] = slist
+
+	clustering = DBSCAN(eps=eps,min_samples=min_s).fit(X_cp)
+
+	labels = clustering.labels_
+
+	core_samples_mask = np.zeros_like(labels,dtype=bool)
+	core_samples_mask[clustering.core_sample_indices_] = True
+
+	for k in set(labels):
+		class_member_mask = (labels==k)
+		xy = X_cp[class_member_mask]
+		for x,y in zip(xy[:,0],xy[:,1]):
+			xs.append(x)
+			ys.append(y)
+			n_cl.append(int(k))
+	temp_df["X"] = xs
+	temp_df["Y"] = ys
+	temp_df["N_Cluster"] = n_cl
+
+	df = pd.merge(XY,temp_df,on=["X","Y"]) # cluster by id
+
+	for i in df["N_Cluster"].drop_duplicates():
+		ids = df[df["N_Cluster"]==i]["IDs"].tolist()
+		avg = df[df["N_Cluster"]==i]["Scores"].mean()
+		finl_df[i] = [len(ids),avg,','.join(ids)]
+
+	finl_df = pd.DataFrame.from_dict(finl_df,orient="index").reset_index()
+	finl_df.columns = ["N_Cluster","N.IDs","Avg.PCScore","IDs"]
+	finl_df.sort_values(by="Avg.PCScore",inplace=True,ascending=False)
+	finl_df.to_csv(a + ".DBSCAN.cluster.csv",index=False) # Extract Result of DBSCAN
+
+	return clustering
+		
+def DBSCAN_Plot(a,X_cp,clustering,aa1):
 
 	labels = clustering.labels_
 	n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
@@ -190,6 +291,7 @@ def DBSCAN_Plot(a,X_cp,aa1):
 
 	aa1.set_xlabel("Estimated number of clusters: %d"%n_clusters_,fontsize=20.0)
 	aa1.set_title("Clustering by DBSCAN: %s"%a,fontsize=30)
+	#aa1.grid(True)
 
 def Kmeans_Plot(a,X_cp,aa1):
 	in_cluster = 5
@@ -208,6 +310,9 @@ def Kmeans_Plot(a,X_cp,aa1):
 
 	aa1.set_xlabel("Clusters: %d"%in_cluster,fontsize=20.0)
 	aa1.set_title("Clustering by KMeans: %s"%a,fontsize=30.0)
+	#aa1.grid(True)
+
+
 def Make_ZID_dic(df,a):
 	didi = {}
 	if len(df) <= a:
@@ -218,8 +323,8 @@ def Make_ZID_dic(df,a):
 	Main_SMI_list = []
 	Main_ID_list = []
 	for idx,line in df.iterrows():
-		zid = line[0]
-		smi = line[1]
+		zid = line["ZID"]
+		smi = line["SMILES"]
 		didi[zid] = smi
 
 	for i in random.sample(didi,n_samples):
@@ -228,24 +333,101 @@ def Make_ZID_dic(df,a):
 
 	return Main_ID_list,Main_SMI_list,didi
 
-def Calc_Dist(aa,bb,a):
-	df = pd.DataFrame([aa,bb]).T
-	df.columns = [0,1]
-	print(df)
-	Main_ID_list,Main_SMI_list,ZID_Dic = Make_ZID_dic(df,a)
-	Dis_Mat = Make_Distance_Mat(Main_ID_list,Main_SMI_list,ZID_Dic)
+
+def Reading_Input_File(in_file):
+    
+    fp_for_in = open(in_file,'r')
+    head = fp_for_in.readline()
+    skip_line = fp_for_in.readline()
+
+    lines =fp_for_in.readlines()
+    fp_for_in.close()
 
 
-	return Dis_Mat
+    Main_SMI_list=[]
+    Main_ID_list=[]
+    Main_Score_list = []
+    idx=0
+    for aline in lines:
+        token = aline.split(',')
+        Main_ID_list.append(token[0])
+        Main_SMI_list.append(token[-1])
+        Main_Score_list.append(np.float64(token[1]))
+
+    return Main_ID_list,Main_SMI_list,Main_Score_list
+
+
+def Cluster_DBSCAN(Mat_name,nlist,slist,epsilon,min_s):
+
+    time_sp1=time()
+
+    print('\nStarting clustering........')
+
+    dis_matrix = Mat_name+'.Dis_matrix.npy'
+    
+    X = np.load(dis_matrix) 
+    X = np.ones((len(X),len(X))) - X
+    
+    G = nx.from_numpy_matrix(X)
+    pos = nx.spring_layout(G,seed=1)
+    X_cp = pd.DataFrame(pos.values())
+    X_cp = StandardScaler().fit_transform(X_cp)
+    
+    fig = plt.figure(figsize=(30,15))
+    ax1 = fig.add_subplot(1,2,1)
+    ax2 = fig.add_subplot(1,2,2)
+    
+    fn = os.path.basename(dis_matrix).split(".")[0]
+    
+    Dendrogram_Plot(fn,X_cp,ax1)
+    clustering = Activate_DBSCAN(fn,X_cp,nlist,slist,epsilon,min_s)
+    DBSCAN_Plot(fn,X_cp,clustering,ax2)
+    
+    fig.tight_layout()
+    
+    if not os.path.exists("%s_PNG"%fn):
+        os.makedirs("%s_PNG"%fn)
+    else:
+        pass
+    
+    fig.savefig("%s_PNG/%s.png"%(fn,fn))
+    print('  -> End clustering........')
+    
+    time_sp2=time()
+    print '  -> Processing time to make distance matrix: '+str(time_sp2-time_sp1)+'s for '+str(len(X))+' ZIDs\n'
+
+    return
+
+
+
 if __name__ == "__main__":
+
+
+    parser=argparse.ArgumentParser()
+    parser.add_argument('-infile',required=True, help='input csv file')
+    #parser.add_argument('-re_mat',required=True, choices=['y','n'], help='input csv file')
+    parser.add_argument("-eps",default=0.1,type=float,help="DBSCAN epsilon dtype is float")
+    parser.add_argument("-min_s",default=4,type=int,help="DBSCAN minimum samples to define cluster dtype is int")
+    parser.add_argument("-n_sam",default=1000,type=int,help="Number of Samples to Analysis default is 1000")
+    args=parser.parse_args()
+
+    Input_CSV = args.infile 
+    epsilon = args.eps
+    min_sam = args.min_s
+    n_sam = args.n_sam
+    re_mat='y'
+    Mat_name = Input_CSV #'X'
+	#scores = [np.float64(line.split(","[1]) for line in open(Input_CSV).readlines() if not line.startswith("ZID")][:n_sam]
+    Main_ID_list,Main_SMI_list,Main_Score_list = Reading_Input_File(Input_CSV)
+    #Main_ID_list,Main_SMI_list = Reading_Input_File(Input_CSV,id_idx,smi_idx)
+    #print(Main_ID_list, Main_SMI_list)
+    dis_mat = Start_Make_DisMat(Main_ID_list,Main_SMI_list,Mat_name,n_sam,re_mat)
+
+    Cluster_DBSCAN(Mat_name,Main_ID_list[:n_sam],Main_Score_list[:n_sam],epsilon,min_sam)
+
+    '''
 	inf = sys.argv[1]
-	fn = os.path.basename(inf).split(".")[0]
-	df = pd.read_csv(inf)[1:]
-	aa = df["ZID"]
-	bb = df["SMILES"]
-	inf = Calc_Dist(aa,bb,1000)
-	np.save(fn + ".Dist_Mx.save.npy",inf)
-	X = np.load(fn + ".Dist_Mx.save.npy") 
+	X = np.load(inf) 
 	X = np.ones((len(X),len(X))) - X
 
 	G = nx.from_numpy_matrix(X)
@@ -260,6 +442,7 @@ if __name__ == "__main__":
 	ax1 = fig.add_subplot(1,2,1)
 	ax2 = fig.add_subplot(1,2,2)
 
+	fn = os.path.basename(inf).split(".")[0]
 
 	Dendrogram_Plot(fn,X_cp,ax1)
 	DBSCAN_Plot(fn,X_cp,ax2)
@@ -271,3 +454,8 @@ if __name__ == "__main__":
 	else:
 		pass
 	fig.savefig("%s_PNG/%s.png"%(fn,fn))
+
+    '''
+
+
+
