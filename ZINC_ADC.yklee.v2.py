@@ -2682,12 +2682,9 @@ def yklee_work(a_type):
 					sum_df = pd.DataFrame()
 				else:
 					sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),zdf)
-					dist_df = Calc_Dist(zdf["ZID"],zdf["SMILES"])
-			#elif a_type == 3 and type(total_df) == type(pd.DataFrame()):
 			
 			else:
 				sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),total_df)
-				dist_df = Calc_Dist(total_df["ZID"],total_df["SMILES"])
 
 		################
 		# Make Summary #
@@ -2699,7 +2696,6 @@ def yklee_work(a_type):
 				with open(out_file2,"a") as W:
 					W.write(file_name + "\t" + asmi + '\n')
 			else:
-				IMG_Plot(rei_img_Path,file_name,dist_df)
 				if not os.path.exists(out_file1):
 					sum_df.to_csv(out_file1,index=False,mode="w")
 				else:
@@ -2897,22 +2893,6 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	print(zdf)
 	zdf.to_csv(out_csv_path + file_name + ".ZADC.csv",index=False)
 	return zdf
-
-
-def IMG_Plot(img_path,fn,X):
-	X_cp = pd.DataFrame(spectral_embedding(X,n_components=2)).values
-	X_cp = StandardScaler().fit_transform(X_cp)
-
-	fig = plt.figure(figsize=(30,15))
-	ax1 = fig.add_subplot(1,2,1)
-	ax2 = fig.add_subplot(1,2,2)
-
-	Dendrogram_Plot(fn,X_cp,ax1)
-	DBSCAN_Plot(fn,X_cp,ax2)
-
-	fig.tight_layout()
-
-	fig.savefig("%s/%s.cluster.png"%(img_path,fn))
 
 
 def Extract_ADC():
