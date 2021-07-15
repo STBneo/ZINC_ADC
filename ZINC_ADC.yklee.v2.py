@@ -53,7 +53,7 @@ from ADC_tools.MD_DB import *
 from ADC_tools.MD_Align import *
 from ADC_tools.MD_BA_class2 import *
 from ADC_tools.MD_Output import *
-from ADC_tools.MD_Cluster import Calc_Dist,Dendrogram_Plot,DBSCAN_Plot
+from ADC_tools.MD_Cluster import *
 
 class bcolors:
     HEADER = '\033[95m'
