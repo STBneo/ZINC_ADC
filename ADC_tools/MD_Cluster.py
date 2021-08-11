@@ -12,7 +12,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram,linkage
 from sklearn.manifold import spectral_embedding
-
+from rdkit import Chem
 import matplotlib
 import argparse
 
@@ -397,8 +397,28 @@ def Cluster_DBSCAN(Mat_name,nlist,slist,epsilon,min_s):
     print '  -> Processing time to make distance matrix: '+str(time_sp2-time_sp1)+'s for '+str(len(X))+' ZIDs\n'
 
     return
+def Scaffold_Clustering(CF_dic,finl_dic,remain_smiles):
+	if not remain_smiles:
+		return
 
-
+	first = set()
+	asmi = list(remain_smiles)[0]
+	for j in remain_smiles:
+		comparison_substruct(CF_dic,first,asmi,j)
+	finl_dic[asmi] = list(first)
+	remain_smiles = set(remain_smiles) - first
+	Scaffold_Clustering(CF_dic,finl_dic,remain_smiles)
+def comparison_substruct(CF_dic,tlist,x,y):
+	rm1 = Chem.MolFromSmiles(CF_dic[x])
+	rm2 = Chem.MolFromSmiles(CF_dic[y])
+	
+	gsm1 = rm1.GetSubstructMatch(rm2)
+	gsm2 = rm2.GetSubstructMatch(rm1)
+	
+	if gsm1 and gsm2:
+		tlist.add(y)
+	else:
+		pass
 
 if __name__ == "__main__":
 
