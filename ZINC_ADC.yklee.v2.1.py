@@ -3177,6 +3177,8 @@ def Active_Clustering(fn,bb_list,id_list):
 	df = pd.DataFrame()
 	temp_list = []
 	temp_list2 = []
+	temp_list3 = []
+	temp_list4 = []
 	df["Backbone"] = bb_list
 	df["ZID"] = id_list
 
@@ -3213,15 +3215,22 @@ def Active_Clustering(fn,bb_list,id_list):
 	for idx,line in ddf.iterrows():
 		tnum = 0
 		for i in line["Cluster_Members"].split(","):
-			tsum = len(df[df["Backbone"]==i]["ZID"].values[0])
+			aa = df[df["Backbone"]==i]["ZID"].values[0].split(",")
+			print(type(aa))
+			print(aa)
+			tsum = len(aa)
 			tnum += tsum
+			for j in aa: #df[df["Backbone"]==i]["ZID"].values[0]): #.split(","):
+				temp_list3.append(j)
 		temp_list.append(tnum)
 		rm = Chem.MolFromSmiles(line["Backbone"])
 		sssr = Chem.GetSSSR(rm)
 		temp_list2.append(sssr)
+		temp_list4.append(",".join(temp_list3))
+	ddf.drop("ZID",axis=1,inplace=True)
 	ddf["Total of ZIDs"] = temp_list
 	ddf["Num of Rings"] = temp_list2
-
+	ddf["ZID"] = temp_list4
 	ddf = ddf[["Backbone","Num of Rings","Total of ZIDs","Cluster_Members","ZID"]]
 	ddf.sort_values(by="Total of ZIDs",ascending=False,inplace=True)
 	ddf.to_csv(out_csv_path + "%s.Cluster.csv"%fn,index=False)
