@@ -2733,7 +2733,7 @@ def working_a1(asmi,file_name,afile):
 	Ok_flag = 0
 	idx = 0
 	aBB = Extract_BB(asmi) 
-	re_list = working_a0(aBB,file_name)
+	re_list = working_a0(asmi,file_name)
 	if re_list == -1:
 		re_list = set()
 	else:
@@ -2787,7 +2787,7 @@ def working_a2(asmi,file_name,InputCP):
 	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
 	wsmi_df["ZID"] = "* "+ file_name
 	if not re_list :
-		re_list = working_a0(aBB,file_name)
+		re_list = working_a0(asmi,file_name)
 	elif re_list == -1:
 		re_list = set()
 	else:
@@ -2866,7 +2866,7 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	aBB = Extract_BB(asmi)
 	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
 	wsmi_df["ZID"] = "* " + file_name
-	re_list = working_a0(aBB,file_name)
+	re_list = working_a0(asmi,file_name)
 	if re_list == -1:
 		re_list = set()
 	else:
