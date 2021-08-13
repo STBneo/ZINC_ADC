@@ -2903,7 +2903,7 @@ def working_ZDC(asmi,file_name,afile,InputCP):
 	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
 	wsmi_df["ZID"] = "* " + file_name
 	global CF_dic,finl_dic
-	re_list = working_a0(aBB,file_name)
+	re_list = working_a0(asmi,file_name)
 	if re_list == -1:
 		re_list = set()
 	else:
