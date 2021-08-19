@@ -2952,7 +2952,6 @@ def working_ZDC2(asmi,file_name,afile,InputCP):
 		re_list = set(re_list)
 
 	re_list1 = working_a1(asmi,file_name,afile)
-
 	if re_list1 == -1:
 		return
 	else:
@@ -3640,8 +3639,13 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 		return -1
 	pBB = Extract_BB(psmi)
 	
-	InSCF_list = Extract_Inner_Scaffold(pBB)
-	
+	#InSCF_list = Extract_Inner_Scaffold(pBB)
+	#InSCF_list = Extract_Inner_Scaffold_3(pBB)
+	#print(InSCF_list)
+	if Check_Ring_Total_Ring_Num(pBB) <=2:
+		InSCF_list = Less_Than_Two_Ring(pBB)
+	else:
+		InSCF_list = Extract_Inner_Scaffold_3(pBB)
 	if InSCF_list == -1 or not InSCF_list: # pass point 3
 		print("There is no \"Scaffold\" in the Mol")
 		return -1
@@ -3674,7 +3678,8 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 			pool.map(func,retri_list)
 			pool.close()
 			pool.join()
-			if len(Re_Zid_list) >= 250 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
+			print(len(Re_Zid_list))
+			if len(Re_Zid_list) >= 100 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
 				break_flag = 1
 			else:
 				break_flag = 0
