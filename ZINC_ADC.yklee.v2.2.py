@@ -2953,7 +2953,7 @@ def working_ZDC2(asmi,file_name,afile,InputCP):
 
 	re_list1 = working_a1(asmi,file_name,afile)
 	if re_list1 == -1:
-		return
+		return pd.DataFrame()
 	else:
 		re_list = re_list|set(re_list1)
 
