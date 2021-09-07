@@ -2959,15 +2959,13 @@ def working_ZDC2(asmi,file_name,afile,InputCP):
 		re_list = re_list|set(re_list1)
 
 	ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff)
-	if zdf.empty:
-		return pd.DataFrame()
-	else:
-		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
-		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
-		print(zdf)
-		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
 
-		return zdf
+	zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
+	zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
+	print(zdf)
+	zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
+
+	return zdf
 
 def Extract_ADC():
 
@@ -3857,9 +3855,11 @@ def MatchM_Substructre(Re_Zid_list,Scaffold,relist):
         return -1
 
     if len(match_list)>0:
+        #print 'Scaffold:',Scaffold,'BB:',aBB
         # Added at 20210831 by swshin
         if Check_Same_Scaffold(Scaffold,aBB)!=-1:
             print 'Matched ID:',aBB,'                                                             \r',
+            #print 'OK:Good-Scaffold:',Scaffold,'BB:',aBB
             sys.stdout.flush()
             Re_Zid_list.append(aBB)
         else:

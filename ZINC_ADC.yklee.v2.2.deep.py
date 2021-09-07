@@ -2594,6 +2594,7 @@ def yklee_work_help():
 	# a_type == 1 : Tier 1.5 Matching --> Inter-Ring Search Method  #
 	# a_type == 2 : Tier 1.6 Matching --> Backbone Alignment Method #
     # a_type == 3 : ZINC_ADC Matching --> Extract ADC compound      #
+	# a_type == 4 : ZINC_ADC in Large DB --> Deep Search            #
 	#################################################################
 """)
 def yklee_work(a_type):
@@ -2668,6 +2669,12 @@ def yklee_work(a_type):
 				bblist = -1
 			else: 
 				bblist = 1
+		elif a_type == 4:
+			total_df = working_a4(asmi,file_name,afile,Input_CP)
+			if total_df.empty:
+				bblist = -1
+			else:
+				bblist = 1
 		else:
 			sys.exit(1)
 
@@ -2678,7 +2685,7 @@ def yklee_work(a_type):
 			pass
 		else:
 			if a_type == 0 or a_type == 1:
-				ZIDs,zdf = BB_Align_Class_Search(Extract_BB(asmi),file_name,bblist,ZIDs,N_ZIDs_cutoff)
+				ZIDs,zdf = BB_Align_Class_Search(Extract_BB(asmi),asmi,file_name,bblist,ZIDs,N_ZIDs_cutoff)
 				if zdf.empty or zdf is None:
 					sum_df = pd.DataFrame()
 				else:
@@ -2740,7 +2747,19 @@ def working_a1(asmi,file_name,afile):
 		re_list = set(re_list)
 	Total_re_list = T15_Class_Search_yklee(afile,TR_MW,M_MW)
 	return Total_re_list
-
+def working_a1_deep(asmi,file_name,afile):
+	M_MW = 0.1
+	TR_MW = 38.0
+	OK_flag = 0
+	idx = 0
+	aBB = Extract_BB(asmi)
+	re_list = working_a0(asmi,file_name)
+	if re_list == -1:
+		re_list = set()
+	else:
+		re_list = set(re_list)
+	Total_re_list = T15_Class_Search(afile,TR_MW,M_MW)
+	return Total_re_list
 def BB_Query_parameters(asmi,mw_percent):
 	omol = readstring("smi",asmi)
 	csmi = "C"*(len(omol.atoms)-4) + "NNOO"
@@ -2881,7 +2900,7 @@ def working_ZADC(asmi,file_name,afile,InputCP):
 	if not fin_df.empty:
 		zdf = pd.concat([wsmi_df,fin_df])
 	else:
-		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
+		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
 		if len(ZIDs) >= N_ZIDs_cutoff:
 			print(zdf)
 			pass
@@ -2919,7 +2938,7 @@ def working_ZDC(asmi,file_name,afile,InputCP):
 	if not fin_df.empty:
 		zdf = pd.concat([wsmi_df,fin_df])
 	else:
-		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff)
+		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
 		if len(ZIDs) >= N_ZIDs_cutoff:
 			print(zdf)
 			pass
@@ -2958,17 +2977,49 @@ def working_ZDC2(asmi,file_name,afile,InputCP):
 	else:
 		re_list = re_list|set(re_list1)
 
-	ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff)
+	#ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff)
+	ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
 	if zdf.empty:
+		print("No Result")
 		return pd.DataFrame()
 	else:
+
 		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
 		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
 		print(zdf)
 		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
 
 		return zdf
+def working_a4(asmi,file_name,afile,InputCP):
+	fin_df = pd.DataFrame()
+	ZIDs = []
+	aBB = Extract_BB(asmi)
+	wsmi_df = pd.DataFrame.from_dict(InputCP,orient="index").T
+	wsmi_df["ZID"] = "* " + file_name
 
+	re_list = working_a0(asmi,file_name)
+
+	if re_list == -1:
+		re_list = set()
+	else:
+		re_list=set(re_list)
+
+	re_list1 = working_a1_deep(asmi,file_name,afile)
+	if re_list1 == -1:
+		return pd.DataFrame()
+	else:
+		re_list = re_list|set(re_list1)
+	ZIDs,zdf = BB_Align_Class_Search(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
+	if zdf.empty:
+		print("No Result")
+		return pd.DataFrame()
+	else:
+		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
+		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
+		print(zdf)
+		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
+		return zdf
+"""
 def Extract_ADC():
 
     global T1_pcscore_cutoff,N_ZIDs_cutoff
@@ -3026,11 +3077,6 @@ def Extract_ADC():
     #OK_flag=0
     # For one input
     out_file = "./Data/ADC_Output/Out_Summary.csv"
-    """
-    if not os.path.exists(out_file):
-        pass
-    else:
-        os.remove(out_file)"""
     out_file2 = "./Data/ADC_Output/Error_SMILES.csv"
 
     
@@ -3139,7 +3185,7 @@ def Extract_ADC():
     #sum_df1.to_csv(out_file,index=False)
 
     return
-
+"""
 
 
 def T1_Class_Search(aBB,file_name,m_type):
@@ -3152,7 +3198,7 @@ def T1_Class_Search(aBB,file_name,m_type):
 
     return zids
 
-def BB_Align_Class_Search(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff): # from MD_BA_class2
+def BB_Align_Class_Search(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP): # from MD_BA_class2
     didi = {} # Manager().dict()
     smis = []
     zids = set(ZIDs)
@@ -3174,14 +3220,16 @@ def BB_Align_Class_Search(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff): # from MD_B
     pool.close()
     pool.join()
 
-    zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
+    #zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
+    #zzids,ddf = Make_result_deep(file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
+    zzids,ddf = Make_result(4,asmi,file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
     if zzids is None:
-        return
+        return pd.DataFrame()
     else:
         zzids = list(zzids)
 
         return zzids,ddf
-def BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff):
+def BB_Align_Class_Search_ForZADC(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP):
 	didi = {}
 	smis = []
 	zids = set(ZIDs)
@@ -3196,7 +3244,9 @@ def BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff):
 	Align_DF2 = Align_DF #[Align_DF["PCScore"] >= 0.8] # Backbone PCScore Cutoff
 	
 	Align_DF2.to_csv("./Data/ADC_Output/" + in_ID + ".total.csv",index=False)
-	zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
+	#zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
+	#zzids,ddf = Make_result_deep(file_name)
+	zzids,ddf = Make_result(1,asmi,file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
 	if zzids is None:
 		return
 	else:
@@ -3323,7 +3373,7 @@ def T5_Class_Search(df_subscaffold):
             break
 
     return
-
+"""
 def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
 
 
@@ -3438,9 +3488,9 @@ def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
 
     print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
     return Re_Zid_list,t_mw
-
+"""
 #def T15_Class_Search_Type2(afile,TR_MW,M_MW,MW_Index_list):
-def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
+def T15_Class_Search_old(afile,TR_MW,M_MW,MW_Index_list):
 
 
     Re_ID_List=[]
@@ -3692,70 +3742,79 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 	Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
 	return Re_Zid_list
 
+def T15_Class_Search(afile,TR_MW,M_MW):
+    Re_ID_List = []
+    atmp_list = []
 
-def T15_Class_Search_yklee_temp(afile,TR_MW,M_MW):
-	Re_ID_List = []
-	atmp_list = []
-	temp_dic = {}
-	Max_Num = 500
+    Max_Num = 500
 
-	print("For File : %s"%afile)
-	print("Start Processing T1.5......")
+    print("\nFor file : %s"%afile)
+    print("Start Processing T1.5....")
 
-	asmi = Read_SMILES_FILE(afile)
-	asmi = Make_Canonical_SMI(asmi)
+    asmi = Read_SMILES_FILE(afile)
+    asmi = Make_Canonical_SMI(asmi)
+    if asmi == -1: # pass point 1
+        print("\nIt is Impossible to change Canonical SMILES\n")
+        return -1
+    try: # pass point 2
+        pmol = readstring("smi",asmi)
+        psmi = pmol.write("smi")
+    except:
+        print("\nIt is Impossible to change SMILES\n")
+        return -1
+    pBB = Extract_BB(psmi)
 
-	if asmi == -1:
-		print("It is Impossible to change Canonical SMILES")
-		return -1
-	try:
-		pmol = readstring("smi",asmi)
-		psmi = pmol.write("smi")
-	except:
-		print("It is Impossible to change SMILES")
-		return -1
+    #InSCF_list = Extract_Inner_Scaffold(pBB)
+    #InSCF_list = Extract_Inner_Scaffold_3(pBB)
+    #print(InSCF_list)
+    if Check_Ring_Total_Ring_Num(pBB) <=2:
+        InSCF_list = Less_Than_Two_Ring(pBB)
+    else:
+        InSCF_list = Extract_Inner_Scaffold_3(pBB)
+    if InSCF_list == -1 or not InSCF_list: # pass point 3
+        print("There is no \"Scaffold\" in the Mol")
+        return -1
+    t_mw = 0
+    manager = Manager()
+    Re_Zid_list = manager.list()
+    n_bbs = 0
+    for alist in InSCF_list:
+        Scaffold = alist[0]
+        break_flag = 0
+        mw_percent = 7.5
+        while break_flag == 0:
 
-	pBB = Extract_BB(psmi)
-	InSCF_list = Extract_Inner_Scaffold(pBB)
+            IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
 
-	if InSCF_list == -1 or not InSCF_list:
-		print("There is no \"Scaffold\" in the Mol")
-		return -1 
-	t_mw = 0
-	manager = Manager()
-	Re_Zid_list = manager.list()
-	n_bbs = 0
-	for alist in InSCF_list:
-		Scaffold = alist[0]
-		break_flag = 0
-		mw_percent = 7.5
-		while break_flag ==0:
-            # Just calculate the parameters
-			IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
-			retri_list = Fetch_PBB_BY_MW_RingNum(entities,DB_Path)
-			if type(retri_list) == int:
-				pass
-			else:
-				print("--> The number of retrieval: " + str(len(retri_list)))
-			if retri_list == -1:
-				print("--> There is no result of query and pass")
-				return -1
+            #break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
+            retri_list = Fetch_BB_BY_MW_RingNum(entities,DB_Path)
+            if type(retri_list) == int:
+                pass
+            else:
+                print '  --> The number of retrieval: '+str(len(retri_list))
 
-			Ncpu = multiprocessing.cpu_count()
-			pool =multiprocessing.Pool(Ncpu-2)
-			func = partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-			pool.map(func,retri_list)
-			pool.close()
-			pool.join()
-			if len(Re_Zid_list) >= 250 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
-				break_flag = 1
-			else:
-				break_flag = 0
-				mw_percent += 5.0
-	print("Total Num. of candidiate ligand for " + afile + ": " + str(len(Re_Zid_list)))
-	Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
+            if retri_list == -1:
+                print '  --> There is no result of query and pass'
+                return -1
 
-	return Re_Zid_list
+            Num_Of_CPU=multiprocessing.cpu_count()
+            pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
+            func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
+            pool.map(func,retri_list)
+            pool.close()
+            pool.join()
+            print(len(Re_Zid_list))
+            if len(Re_Zid_list) >= 100 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
+                break_flag = 1
+            else:
+                break_flag = 0
+                mw_percent += 5.0
+
+    print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
+    Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
+    return Re_Zid_list
+
+
 ####################################
 # Extract Scaffold For Clustering  #
 ####################################	
@@ -3855,10 +3914,8 @@ def MatchM_Substructre(Re_Zid_list,Scaffold,relist):
         match_list = tm_mol.GetSubstructMatches(patt)
     except:
         return -1
-
     if len(match_list)>0:
-        # Added at 20210831 by swshin
-        if Check_Same_Scaffold(Scaffold,aBB)!=-1:
+        if Check_Same_Scaffold(Scaffold,aBB) != -1:
             print 'Matched ID:',aBB,'                                                             \r',
             sys.stdout.flush()
             Re_Zid_list.append(aBB)
@@ -4074,6 +4131,7 @@ def main():
 
     #Extract_ADC()
     yklee_work(3)
+    #yklee_work(4)
 
 
     time2=time()

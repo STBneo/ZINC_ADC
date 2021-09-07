@@ -46,7 +46,9 @@ import pprint
 
 from MD_DB import *
 from MD_Align import *
-
+global java_path
+#java_path = "/lwork01/tools/jdk1.8.0_101/bin/"
+java_path = ""
 def featurize_atoms(mol):
     feats = []
     for atom in mol.GetAtoms():
@@ -569,7 +571,7 @@ def mol_scaffold_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     # read the sng output
     re_name=lid+'.tmp'
@@ -614,7 +616,7 @@ def mol_scaffold_backbone_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
     #process.wait()
 
     # read the sng output
@@ -2340,7 +2342,7 @@ def Make_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2546,7 +2548,7 @@ def Extract_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2671,7 +2673,7 @@ def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2735,7 +2737,7 @@ def Extract_SubScaffold(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -4212,6 +4214,118 @@ def Less_Than_Two_Ring(smi):
         return 0
         
 
+def Show_Index_Information(asmi):
+
+    asmi = Make_Canonical_SMI(asmi)
+    amol = Chem.MolFromSmiles(asmi)
+
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(amol)
+    dic_atom_sym = Extract_Atom_sym(amol)
+    
+    print
+    print 'dic_atom_neig_idx:',dic_atom_neig_idx
+    print 'dic_atom_neig_sym:',dic_atom_neig_sym
+    print 'dic_atom_sym:',dic_atom_sym
+    print
+
+
+
+
+def Check_Same_Scaffold(ssmi,tsmi):
+
+    # ssmi: scaffold smiles
+    # tsmi: target smiles
+
+    ssmi = Make_Canonical_SMI(ssmi)
+    tasmi = Make_Canonical_SMI(tsmi)
+
+    tm_mol = Chem.MolFromSmiles(tasmi)
+    patt = Chem.MolFromSmiles(ssmi)
+
+    ###############################
+    # For test driver
+    #Show_Index_Information(tsmi)
+    #Show_Index_Information(ssmi) 
+    ##############################
+
+
+    match_list = tm_mol.GetSubstructMatches(patt)
+    match_set = set(match_list[0])
+    #print 'match set:',match_set
+
+    p_ssr = Chem.GetSymmSSSR(patt)
+    s_ring_number = len(p_ssr)
+    #print s_ring_number
+
+    ssr = Chem.GetSymmSSSR(tm_mol) 
+    '''
+    print len(ssr)
+    for aring in ssr:
+        print set(list(aring))
+    #return
+    print '\n\n'
+    #return
+    '''
+
+    ring_count=0
+    for aring in ssr:
+        #print 'ring idex:',set(list(aring))
+        aring_path = set(list(aring)) 
+        tmp_set = (aring_path & match_set)
+        #print tmp_set
+        if len(aring_path & match_set) > 1:
+            #print 'found'
+            ring_count +=1
+        #print
+
+    #print ring_count
+
+    if s_ring_number == ring_count:
+        # Good
+        return 1
+    else:
+        # Bad
+        return -1
+
+
+
+    '''
+    ############
+    # Bad code because of wrong index: rdkit index is different from pybel
+    ############
+
+    # for num. of ring of scaffold 
+    smol = readstring('smi',ssmi)
+    list_ring=smol.sssr
+    s_ring_number = len(list_ring)
+    print s_ring_number
+
+
+    amol = readstring('smi',tsmi)
+    list_ring=amol.sssr
+    num_ring = len(list_ring)
+    print num_ring
+    #print list_ring
+    ring_count = 0 
+    
+    for aring in list_ring:
+        print 'ring idex:',aring._path
+        aring_path = set(aring._path)
+        tmp_set = (aring_path & match_set)
+        print tmp_set
+        if len(aring_path & match_set) > 1:
+            #print 'found'
+            ring_count +=1
+        print
+
+    print ring_count
+
+    if s_ring_number == ring_count:
+        return 1
+    else:
+        return -1
+    '''
+
 
 def MD_Backbone_show():
     print '\'asmi\' means a smiles string'
@@ -4272,10 +4386,18 @@ def main():
     smi = 'COC1CN(CCN1)C(C)=O'
     smi = 'Cc1c(C(=O)N2CCN(c3ccccc3O)CC2)cnn1c1ccccc1Cl'
     smi = 'CC1=NC2=C(N1)C=NC(C)=C2O'
-    smi = "CCc1ncc(C(=O)N2CCC([C@H]3NNC[C@@H]3c3cccc(F)c3)CC2)cn1"
+
+    # 5NDZ_8UN
+    #smi = 'c1cc2c(cc1C(=O)Nc1ccc(cc1)C#N)nc(n2[C@H](C1CCCCC1)C)c1cc2c(cc1Br)OCO2'
+
+    # 5NDZ_8TZ
+    smi = 'O[C@H](c1ncc[nH]1)c1ccc(F)cc1Cc1cncnc1'
+
+    # Test
+    smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    
    
     asmi = Make_Canonical_SMI(smi)
-    print(asmi)
     pmol = readstring('smi',asmi)
     asmi = pmol.write(format='smi')
     pBB = Extract_BB(asmi)
@@ -4295,6 +4417,57 @@ def main():
 
     #re_list = Extract_SSSR_Idx(smi)
     #print re_list
+
+    # 8UN
+    #t_smi = 'O=C(c1ccc2c(c1)nc1CCCCCn21)N1CCN(c2ccccn2)CC1'
+
+    # 8TZ
+    #t_smi = 'O=C1CCc2ccc3[nH]ccc3c12'
+
+    # Test
+    t_smi = 'O=C(c1cc(C2CC2)nc2ccccc12)N1CCC1'
+    '''
+    tasmi = Make_Canonical_SMI(t_smi)
+    tm_mol = Chem.MolFromSmiles(tasmi)
+    patt = Chem.MolFromSmiles(re[0][0])
+    match_list = tm_mol.GetSubstructMatches(patt)
+    print match_list
+    print len(match_list[0])
+    match_set = set(match_list[0])
+
+    smol = readstring('smi',re[0][0])
+    list_ring=smol.sssr
+    print 'Source ring numnber:',len(list_ring)
+
+
+    amol = readstring('smi',tasmi)
+    list_ring=amol.sssr
+    #list_ring=tm_mol.sssr
+    num_ring = len(list_ring)
+    #print num_ring
+    #print list_ring
+    ring_count = 0 
+    for aring in list_ring:
+        #print 'ring idex:',aring._path
+        aring_path = set(aring._path)
+        #tmp_set = (aring_path & match_set)
+        #print tmp_set
+        if len(aring_path & match_set) > 0:
+            #print 'found'
+            ring_count +=1
+    print ring_count
+    '''
+    print re[0][0]
+
+    #print(Check_Same_Scaffold(re[0][0],t_smi))
+
+    smi = 'Cc1cc(C)c2ccccc2n1'
+    t_smi = 'c1ccc2c(c3ncn[nH]3)cc(C3CC3)nc2c1'
+    print(Check_Same_Scaffold(smi,t_smi))
+
+
+
+
 
     #re = Extract_Atom_Neighbors(smi)
     '''
@@ -4338,5 +4511,6 @@ if __name__=="__main__":
     # Ver 20210526, swshin
     # Ver 20210623, 'Extract_Inner_Scaffold_2(asmi)'
     # Ver 20210818, 'Extract_Inner_Scaffold_3(asmi) and Merge two scaffold into one scaffold!!!!'
+    # Ver 20210831, 'modifiy the Extract_Inner_Scaffold_4(asmi) and add !!!!'
     main()
 

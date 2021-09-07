@@ -1,0 +1,7 @@
+*.smi
+
+ADC_tools/*.pyc
+
+Data/Input/*.smi*
+
+Data/ADC_Output

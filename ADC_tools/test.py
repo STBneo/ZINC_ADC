@@ -197,7 +197,6 @@ class Connect_PCP:
         self.cursorObj = self.conn.cursor()
     def Fetch_CP_Annot(self,ids):
         ids = ids.strip("\'")
-        tmp = []
         try:
             self.cursorObj.execute("SELECT * FROM PCP WHERE ZID=?",(ids,))
         except:
@@ -205,10 +204,7 @@ class Connect_PCP:
             sys.exit(1)
         rows = self.cursorObj.fetchall()
         df = pd.DataFrame(rows)
-        for idx,line in df.iterrows():
-            tmp.append("Purchasable")
-        df["p"] = tmp
-        col_name = ['ZID','SMILES','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity',"Purchasability"]
+        col_name = ['ZID','SMILES','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity']
         df.columns = col_name
         return df
 
@@ -217,11 +213,11 @@ def Final_Annot(idid,id_BB,pcscore):
     for ii in idid:
         iidf = cp_dbs.Fetch_CP_Annot(ii)
         iiidf = pcp_dbs.Fetch_CP_Annot(ii)
-        
+
         if iiidf is None or iiidf.empty:
             pass
         else:
-            merge_idf = pd.merge(iidf,iiidf[["ZID"]],on="ZID")
+            merge_idf = pd.merge(iidf,iiidf,on="ZID")
             merge_idf["Backbone"] = [id_BB[ii]]
             id_df.append(merge_idf)
 
@@ -231,7 +227,7 @@ def Final_Annot(idid,id_BB,pcscore):
         id_df = pd.concat(id_df)
         id_df["PCScore"] = pcscore
         return id_df
-def Make_result(a_type,wsmi,file_name,id_set,ncutoff,aBB,InputCP,DB_Path):
+def Make_result(a_type,file_name,id_set,ncutoff,aBB,InputCP,DB_Path):
     output_path = "./Data/ADC_Output/"
     infile = output_path + file_name + ".total.csv"
 
@@ -267,9 +263,9 @@ def Make_result(a_type,wsmi,file_name,id_set,ncutoff,aBB,InputCP,DB_Path):
         else:
             for i in set(annot_df["ZID"].tolist()):
                 id_set.add(unicode.encode(i,"utf-8"))
-        df_list.append(annot_df)
+
         if len(id_set) >= int(ncutoff):
-            #df_list.append(annot_df)
+            df_list.append(annot_df)
             break
     if not df_list:
         print("No Result %s"%file_name)
@@ -289,9 +285,7 @@ def Make_result(a_type,wsmi,file_name,id_set,ncutoff,aBB,InputCP,DB_Path):
         smi = line["SMILES"]
         id_smi[ids] = smi
         tier_list.append("T 1.5 Inner-Scaffold Search")
-	print(len(tier_list))
-    print(len(fin_df))
-    fin_df["Tier"] = tier_list
+
     z_pcscore = AlignM3D(file_name,wsmi,id_smi.keys(),id_smi.values())
     z_pcscore.rename(columns={"Query":"ZID","PCScore":"Z_PCScore"},inplace=True)
 
