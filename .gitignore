@@ -1,4 +1,5 @@
 *.smi
+*.tmp
 
 ADC_tools/*.pyc
 
@@ -6,3 +7,5 @@ Data/Input/*.smi*
 
 Data/ADC_Output_*
 Data/Input_*
+Data/ADC_Output
+
