@@ -2675,6 +2675,12 @@ def yklee_work(a_type):
 				bblist = -1
 			else:
 				bblist = 1
+        elif a_type == 5:
+            total_df = Search_About_2DBs(asmi,file_name,afile,Input_CP)
+            if total_df.empty:
+                bblist = -1
+            else:
+                bblist = 1
 		else:
 			sys.exit(1)
 
@@ -3019,6 +3025,19 @@ def working_a4(asmi,file_name,afile,InputCP):
 		print(zdf)
 		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
 		return zdf
+
+def Search_About_2DBs(asmi,file_name,afile,InputCP):
+    total_df = working_ZDC2(asmi,file_name,afile,InputCP)
+    if total_df.empty or len(total_df) <=500:
+        temp_df = working_a4(asmi,file_name,afile,InputCP)
+    else:
+        total_df["Search On"] = "Purchasable DB"
+        return total_df
+    total_df["Search On"] = "Purchasable DB"
+    temp_df["Search On"] = "All DB"
+    re_df = pd.concat([total_df,temp_df])
+
+    return re_df
 """
 def Extract_ADC():
 
@@ -4138,8 +4157,9 @@ def main():
     #Extract_CP_SMILES2(i_type,i_content,df)
 
     #Extract_ADC()
-    yklee_work(3)
+    #yklee_work(3)
     #yklee_work(4)
+    yklee_work(5)
 
 
     time2=time()
