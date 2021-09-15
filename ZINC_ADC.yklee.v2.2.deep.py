@@ -3642,6 +3642,10 @@ def T15_query_parameters(ainput,TR_MW,mw_percent):
 	BB = ainput[1]
 	Num_Brench = ainput[2]
 	InputCP = Extract_CP(Scaffold)
+	print("Num of Brench",Num_Brench)
+	print("Backbone",BB)
+	print("Scaffold",Scaffold)
+	print("Chemical Properties",InputCP)
 	# Count Total Ring
 	try :
 		pmol = readstring("smi",BB)
@@ -3698,7 +3702,9 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 	if Check_Ring_Total_Ring_Num(pBB) <=2:
 		InSCF_list = Less_Than_Two_Ring(pBB)
 	else:
-		InSCF_list = Extract_Inner_Scaffold_3(pBB)
+		#InSCF_list = Extract_Inner_Scaffold_3(pBB)
+		InSCF_list = Extract_Inner_Scaffold_4(pBB)
+	print(InSCF_list)
 	if InSCF_list == -1 or not InSCF_list: # pass point 3
 		print("There is no \"Scaffold\" in the Mol")
 		return -1
@@ -3713,6 +3719,7 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 		while break_flag == 0:
 
 			IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
+			print(entities)
 			
 			#break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
 			retri_list = Fetch_PBB_BY_MW_RingNum(entities,DB_Path)
@@ -3770,7 +3777,8 @@ def T15_Class_Search(afile,TR_MW,M_MW):
     if Check_Ring_Total_Ring_Num(pBB) <=2:
         InSCF_list = Less_Than_Two_Ring(pBB)
     else:
-        InSCF_list = Extract_Inner_Scaffold_3(pBB)
+        #InSCF_list = Extract_Inner_Scaffold_3(pBB)
+		InSCF_list = Extract_Inner_Scaffold_4(pBB)
     if InSCF_list == -1 or not InSCF_list: # pass point 3
         print("There is no \"Scaffold\" in the Mol")
         return -1
