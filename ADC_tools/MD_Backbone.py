@@ -46,9 +46,7 @@ import pprint
 
 from MD_DB import *
 from MD_Align import *
-global java_path
-#java_path = "/lwork01/tools/jdk1.8.0_101/bin/"
-java_path = ""
+
 def featurize_atoms(mol):
     feats = []
     for atom in mol.GetAtoms():
@@ -571,7 +569,7 @@ def mol_scaffold_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     # read the sng output
     re_name=lid+'.tmp'
@@ -616,7 +614,7 @@ def mol_scaffold_backbone_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
     #process.wait()
 
     # read the sng output
@@ -2342,7 +2340,7 @@ def Make_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2548,7 +2546,7 @@ def Extract_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2673,7 +2671,7 @@ def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2737,7 +2735,7 @@ def Extract_SubScaffold(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -3804,6 +3802,302 @@ def Extract_Inner_Scaffold_3(asmi):
 
 
 
+def Extract_Inner_Scaffold_4(asmi):
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    '''
+    print dic_atom_neig_idx
+    print
+    print dic_atom_neig_sym
+    print 
+    print dic_atom_sym
+    print
+    '''
+
+    #return
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+    t_df = copy.deepcopy(df)
+    #print(df)
+    #return
+
+    '''
+    #amol = readstring('smi',alist[1])
+    ssr = Chem.GetSymmSSSR(m)
+    print len(ssr)
+    for aring in range(0,len(ssr)):
+        print list(ssr[aring])
+    return
+    '''
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+    #print
+
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                #print match_list
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+
+                else:
+                    # using LSAlign 
+                    #pc_score = Align3D('m',row[1],'patt',p_smi)
+                    #print pc_score
+                    m_set = set()
+                    tmol = readstring('smi',row[1])
+                    m_set = Extract_Atoms_Set(tmol)
+                    m_list = Extract_Atoms_List(tmol)
+                    q_set = set()
+                    qmol = readstring('smi',p_smi)
+                    q_set =  Extract_Atoms_Set(qmol)
+                    q_list = Extract_Atoms_List(qmol)
+                    #print m_set, q_set
+                    #print m_list, q_list
+
+
+            #print 
+        idx+=1
+
+    #print 'Remove dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+
+    #print 'Is terminal ring'
+
+
+    Terminal_Scaffold_idx =[]
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -1 or re == 0:
+            df = df.drop(df[df.smiles==row[1]].index)
+            patt1 = Chem.MolFromSmiles(row[1])
+            match_list = m.GetSubstructMatches(patt1)
+            if len(match_list)>0:
+                #print 'Termianl scaffold:',match_list[0]
+                #print 'match_list:',match_list[0]
+                tmp = list(match_list[0])
+                tmp.sort()
+                #print tmp
+                Terminal_Scaffold_idx.append(tmp) 
+
+    #print 'Scaffold:',df 
+    #print 'Terminal scaffold idx list:',Terminal_Scaffold_idx
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        #print 'There is no inter-connected ring'
+        #return -1
+        return 0
+
+    list_re =[]
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        re = Matching_Using_MakeScaffoldGeneric(m,patt)
+
+
+        #####################################################################
+        ## Case 1. There is more than two same scaffolds of which is terminal scaffold in ligand
+        ## Romve the scaffold which is terminal scaffold 
+        # Convert the tuple 're' as list 're' to remove terminal scaffold
+        lst_re = []
+        for are in re:
+            tmp_re = list(are)
+            #print(tmp_re)
+            tmp_re.sort()
+            lst_re.append(tmp_re)
+        #print 'lst_re:',lst_re
+
+        lst_re2 = copy.deepcopy(lst_re)
+        # Check whether matching index is in terminal scaffold or not
+        if len(re)>=2:
+            tmp_re = list(re)
+            #print lst_re,re,type(re),'HIHIHIHI'
+            for aidx in lst_re:
+                if aidx in Terminal_Scaffold_idx:
+                    #print 'Terminal scaffold index:',aidx
+                    lst_re2.remove(aidx)
+        #print 'list_re2:',lst_re2
+        
+        # Convert the list_re2 as tuple re
+        #print re
+        re = tuple()
+        for are in lst_re2:
+            atp = tuple(are)
+            #print atp
+            re =re + (atp,)
+        #print 'Re:',re
+        #return
+        ## End Case 1. ########################################################
+
+
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        #print 'At Ring match index: ', match_list
+        #return
+
+        # For editiing
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #print atom_list
+            #return
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #print 'brench dff:',brench_diff
+                    '''
+                    for idx in range(0,brench_diff):
+                        print idx
+                    '''
+
+                    brench = brench + brench_diff
+                    #brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=list(nei_atom_idx - atom_set)
+                    #print 'nei_idx:',is_idx
+                    for tidx in range(0,brench_diff):
+                        ais_idx = is_idx.pop()
+                        #print tidx,ais_idx
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
+             
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'ire:',ire
+                        #print i,ire
+                        bre = mw.AddBond(i,ire,btype)
+                        #print 'bre:',bre
+                        #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    # For merage 
+    #print 'In3',list_re,len(list_re)
+    if len(list_re)>1:
+        merged_smi = Merge_Scaffold(t_df,list_re)
+        #Attach_hand(m,merged_smi)
+        #print merged_smi
+        list_re = Attach_hand(m,merged_smi)
+        #return list_re
+    else:
+        pass
+
+    return list_re
+
+
+
 def Attach_hand(m,smi):
     
     p_smi = Make_Canonical_SMI(smi)
@@ -3845,28 +4139,29 @@ def Attach_hand(m,smi):
                 #print nei_atom,nei_atom_idx
 
                 if len(nei_atom_idx - atom_set) != 0:
-                    brench +=1 
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #brench +=1 
+                    brench = brench + brench_diff
                     #print 'Hi',nei_atom_idx
-                    is_idx=nei_atom_idx - atom_set
+                    is_idx=list(nei_atom_idx - atom_set)
                     #print 'Hi',is_idx
-                    is_idx = list(is_idx).pop()
-                    #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
-                    btype = m.GetBondBetweenAtoms(atom_idx,is_idx).GetBondType()
-                    atype = dic_atom_sym[is_idx]
+                    for tidx in range(0,brench_diff):
+                        ais_idx = list(is_idx).pop()
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
              
-                    atom_num = m.GetAtomWithIdx(is_idx).GetAtomicNum()
-                    #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
 
-                    #print 'Hi',i,atom_idx,is_idx,btype,atype
-                    ire = mw.AddAtom(Chem.Atom(atom_num))
-                    #print 'ire:',ire
-                    #print i,ire
-                    bre = mw.AddBond(i,ire,btype)
-                    #print 'bre:',bre
-                    #print 
-
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'ire:',ire
+                        #print i,ire
+                        bre = mw.AddBond(i,ire,btype)
+                        #print 'bre:',bre
+                        #print 
                 i+=1 
-
     list_re = []
     try:
         Chem.SanitizeMol(mw)
@@ -3978,8 +4273,89 @@ def Is_terminal_Ring(rdmol,asmi,dic_atom_neig_idx):
     patt = Chem.MolFromSmarts(sma)
     '''
     match_list = rdmol.GetSubstructMatches(patt1)
+    #print match_list
 
     ssr = Chem.GetSymmSSSR(patt1)
+
+    if len(match_list)==0 and len(ssr)>=2:
+    #if len(match_list)==0 and len(ssr)>=1:
+
+        re = Matching_Using_MakeScaffoldGeneric(rdmol,patt1)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_lsit2 = re
+
+        '''
+        # Test_Code: Matching using MakeScaffoldGeneric
+        core = MurckoScaffold.GetScaffoldForMol(rdmol)
+        fw = MurckoScaffold.MakeScaffoldGeneric(core)
+        #gf = Chem.MolToSmiles(fw)
+        #print gf
+
+        #patt_2 = MurckoScaffold.GetScaffoldForMol(patt1)
+        #patt_g = MurckoScaffold.MakeScaffoldGeneric(patt_2)
+        patt_g = MurckoScaffold.MakeScaffoldGeneric(patt1)
+        match_list2 = fw.GetSubstructMatches(patt_g)
+        #gf2 = Chem.MolToSmiles(patt_g)
+        #print 'gf2:',gf2
+        #print match_list2
+        '''
+        if len(match_list2)!=0:
+            match_list = match_list2
+
+    #print match_list
+
+    if len(match_list)!= 0:
+        for alist in match_list:
+            X = list(match_list)
+            atom_list = list(X[0])
+            #print atom_list
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx,len(dic_atom_neig_idx[atom_idx]), dic_atom_neig_idx[atom_idx]
+                nei_atoms = dic_atom_neig_idx[atom_idx]
+                for anei_atom in nei_atoms:
+                    if anei_atom not in atom_list:
+                        brench+=1
+        #print 'the number of brench:',brench
+        if brench == 1:
+            return -1
+        else:
+            #print '1'
+            return 1
+    else:
+        #print '0'
+        return 0
+
+    return
+
+
+
+def Is_terminal_Ring_2(rdmol,asmi,dic_atom_neig_idx):
+
+    ''' 
+    ssr = Chem.GetSymmSSSR(rdmol)
+    for aring in range(0,len(ssr)):
+        print list(ssr[aring])
+    '''
+
+    #p_smi = Make_Canonical_SMI(asmi)
+    #print 'p_smi:',p_smi
+    patt1 = Chem.MolFromSmiles(asmi)
+    #patt1 = Chem.MolFromSmiles(p_smi)
+    '''
+    sma = Chem.MolToSmarts(patt1)
+    patt = Chem.MolFromSmarts(sma)
+    '''
+    match_list = rdmol.GetSubstructMatches(patt1)
+
+    ssr = Chem.GetSymmSSSR(patt1)
+    #ln_ring_asmi = len(ssr)
+    #for aring in ssr:
+        
+
 
     if len(match_list)==0 and len(ssr)>=2:
 
@@ -4342,6 +4718,7 @@ def MD_Backbone_show():
     print 'Extract_Inner_Scaffold(asmi),'
     print 'Extract_Inner_Scaffold_2(asmi)' # if there is no interConnected Ring return '0'
     print 'Extract_Inner_Scaffold_3(asmi)' # if there is no interConnected Ring return '0' and merge two scafolds into one scafold
+    print 'Extract_Inner_Scaffold_4(asmi)' # bug fix: if a ligand has more than two hands at a index -> correct the num. of hands
     print 'Make_Canonical_SMI(asmi),'
 
     return
@@ -4394,13 +4771,18 @@ def main():
     smi = 'O[C@H](c1ncc[nH]1)c1ccc(F)cc1Cc1cncnc1'
 
     # Test
-    smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    #smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    smi = 'O=C1NC(=O)[C@@](c2ccccc2)(C2CCCCC2)N1'
+    smi = 'COCCSCCCSc1nnc(Cc2cccs2)n1C1CC1'
     
    
     asmi = Make_Canonical_SMI(smi)
     pmol = readstring('smi',asmi)
     asmi = pmol.write(format='smi')
     pBB = Extract_BB(asmi)
+    #print pBB
+    #return
+
 
     if Check_Ring_Total_Ring_Num(pBB) <=2:
         #print 'less than 2'
@@ -4410,9 +4792,10 @@ def main():
         #print 'more than 2'
         #re = Extract_Inner_Scaffold_2(pBB)
         #print 'R2',re
-        re = Extract_Inner_Scaffold_3(pBB)
+        re = Extract_Inner_Scaffold_4(pBB)
         print 'R3',re
 
+    return
     #print re
 
     #re_list = Extract_SSSR_Idx(smi)
@@ -4512,5 +4895,6 @@ if __name__=="__main__":
     # Ver 20210623, 'Extract_Inner_Scaffold_2(asmi)'
     # Ver 20210818, 'Extract_Inner_Scaffold_3(asmi) and Merge two scaffold into one scaffold!!!!'
     # Ver 20210831, 'modifiy the Extract_Inner_Scaffold_4(asmi) and add !!!!'
+    # Ver 20210914, 'Bug Fix!'
     main()
 
