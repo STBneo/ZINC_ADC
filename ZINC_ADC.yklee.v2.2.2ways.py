@@ -2608,8 +2608,9 @@ def yklee_work(a_type):
 	rei_img_Path = "./Data/Re_Input/IMG/"
 	out_csv_path = "./Data/ADC_Output/"
 
-	DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
+	#DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
 	#DB_Path = "/lwork02/yklee/DB_Table/"
+	DB_Path = "/ssd/yklee/DB_Table/"
 	
 	TR_MW = 38.0
 	if os.path.exists(oPath):
@@ -2675,12 +2676,12 @@ def yklee_work(a_type):
 				bblist = -1
 			else:
 				bblist = 1
-        elif a_type == 5:
-            total_df = Search_About_2DBs(asmi,file_name,afile,Input_CP)
-            if total_df.empty:
-                bblist = -1
-            else:
-                bblist = 1
+		elif a_type == 5:
+			total_df = Search_About_2DBs(asmi,file_name,afile,Input_CP)
+			if total_df.empty:
+				bblist = -1
+			else:
+				bblist = 1
 		else:
 			sys.exit(1)
 
@@ -3020,7 +3021,7 @@ def working_a4(asmi,file_name,afile,InputCP):
 		print("No Result")
 		return pd.DataFrame()
 	else:
-		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
+		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Tier"]]
 		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
 		print(zdf)
 		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
@@ -3030,12 +3031,24 @@ def Search_About_2DBs(asmi,file_name,afile,InputCP):
     total_df = working_ZDC2(asmi,file_name,afile,InputCP)
     if total_df.empty or len(total_df) <=500:
         temp_df = working_a4(asmi,file_name,afile,InputCP)
+        temp_df["Purchasability"] = "Unknown"
     else:
         total_df["Search On"] = "Purchasable DB"
         return total_df
-    total_df["Search On"] = "Purchasable DB"
-    temp_df["Search On"] = "All DB"
-    re_df = pd.concat([total_df,temp_df])
+    #total_df["Search On"] = "Purchasable DB"
+    #temp_df["Search On"] = "All DB"
+    if temp_df.empty and total_df.empty:
+        return pd.DataFrame()
+    elif temp_df.empty :
+        re_df = total_df
+        re_df["Search On"] = "Purchasable DB"
+    else:
+        total_df["Search On"] = "Purchasable DB"
+        temp_df["Search On"] = "All DB"
+        re_df = pd.concat([total_df,temp_df[1:]])
+    re_df = re_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier","Search On"]]
+    re_df1 = pd.concat([re_df[:1],re_df[1:].sort_values(by="Z_PCScore",ascending=False)])
+    re_df1.to_csv(out_csv_path + "%s.2DBs.csv"%file_name,index=False,sep='\t')
 
     return re_df
 """
@@ -3661,10 +3674,10 @@ def T15_query_parameters(ainput,TR_MW,mw_percent):
 	BB = ainput[1]
 	Num_Brench = ainput[2]
 	InputCP = Extract_CP(Scaffold)
-	print("Num of Brench",Num_Brench)
+	#print("Num of Brench",Num_Brench)
 	print("Backbone",BB)
 	print("Scaffold",Scaffold)
-	print("Chemical Properties",InputCP)
+	#print("Chemical Properties",InputCP)
 	# Count Total Ring
 	try :
 		pmol = readstring("smi",BB)
