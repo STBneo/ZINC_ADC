@@ -47,6 +47,12 @@ import pprint
 from MD_DB import *
 from MD_Align import *
 
+from networkx.algorithms import isomorphism
+import numpy as np
+import networkx as nx
+import re
+java_path = ""
+#java_path = "/lwork01/tools/jdk1.8.0_101/bin/"
 def featurize_atoms(mol):
     feats = []
     for atom in mol.GetAtoms():
@@ -569,7 +575,7 @@ def mol_scaffold_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     # read the sng output
     re_name=lid+'.tmp'
@@ -614,7 +620,7 @@ def mol_scaffold_backbone_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
     #process.wait()
 
     # read the sng output
@@ -2340,7 +2346,7 @@ def Make_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2546,7 +2552,7 @@ def Extract_BB(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2671,7 +2677,7 @@ def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2735,7 +2741,7 @@ def Extract_SubScaffold(asmi):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
     fp_for_in=open(re_name,'r')
@@ -2758,6 +2764,12 @@ def Extract_SubScaffold(asmi):
     for aline in lines:
         tmp_list=[]
         token=aline.split('\t')
+        #print token[0],token[1]
+
+        #### - replace [nH] with n
+        #token[1] = token[1].replace('[nH]','n')
+        #print token[1]
+
         tmp_list=[token[0],token[1]]
         Main_list.append(tmp_list)
 
@@ -2991,7 +3003,7 @@ def Extract_SSSR_Idx(asmi):
 
 def Leave_Ring_NoInterconnection(df):
 
-    # Remove like this example: Ring --- O --- Ring
+    # Remove like this example: (Ring) --- O --- (Ring)
     # Only leave the ring itself: Ring, RingRing
     for index,row in df.iterrows():
         #print row[0],row[1]
@@ -4098,15 +4110,708 @@ def Extract_Inner_Scaffold_4(asmi):
 
 
 
+def Extract_Inner_Scaffold_5(asmi):
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    '''
+    print dic_atom_neig_idx
+    print
+    print dic_atom_neig_sym
+    print 
+    print dic_atom_sym
+    print
+    '''
+
+    #return
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+    ##### -  Result of sng
+    t_df = copy.deepcopy(df)
+    #print(df)
+    #return
+
+    '''
+    #amol = readstring('smi',alist[1])
+    ssr = Chem.GetSymmSSSR(m)
+    print len(ssr)
+    for aring in range(0,len(ssr)):
+        print list(ssr[aring])
+    return
+    '''
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    #print 're',re
+
+
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    #### - Remove scaffold which connected with bond like Ring-Ring, Ring-Ring-Ring
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+    #print
+    #return
+
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            #### - Remove the single rings which make the fusion ring
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                '''
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                print match_list
+                '''
+                #if len(match_list) == 0:           
+                try:
+                    match_list , mapping = is_substructure_mol(tmp_mol, patt)
+                except:
+                    return -1
+
+                #print match_list, mapping
+                try:                
+                    Tmatch_list , Tmapping = is_substructure_mol(m, patt)
+                except:
+                    return -1 
+
+                #print Tmatch_list, Tmapping
+                # the ring exist at more than one loaction
+                if len(Tmatch_list)>1:
+                    continue
+
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+                else:
+                    pass 
+
+            #print 
+        idx+=1
+
+    #print 'Resut of removing dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+    #print 'Is terminal ring'
+    Terminal_Scaffold_idx =[]
+    #print tmp_df
+    #return
+
+    #### - Making the terminal ring index and remove terminal ring
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring_2(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -999:
+            return -1
+
+        # If row[1] is not termianl ring
+        if re == 1 or re == 0:       # '1' is terminal node'
+            df = df.drop(df[df.smiles==row[1]].index)
+            # Decide if the ring is substructure or not!!
+            patt1 = Chem.MolFromSmiles(row[1])
+            match_list = m.GetSubstructMatches(patt1)
+            #print 'HIHI',row[1],match_list
+    
+            # Additional code test substructure matching one more
+            if len(match_list)==0:
+                try:
+                    match_list , mapping = is_substructure_mol(m, patt1)
+                except:
+                    return -1
+
+                #print match_list, mapping
+
+            if len(match_list)>0:
+                #print 'Termianl scaffold:',match_list[0]
+                #print 'match_list:',match_list[0]
+                tmp = list(match_list[0])
+                tmp.sort()
+                #print tmp
+                Terminal_Scaffold_idx.append(tmp) 
+            #print 
+    #print 'Scaffold:',df 
+    #print 'Terminal scaffold idx list:',Terminal_Scaffold_idx
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        #print 'There is no inter-connected ring'
+        #return -1
+        return 0
+
+    list_re =[]
+
+    #print 'after making terminal ring idnex:'
+    #print tmp_df
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        #re = Matching_Using_MakeScaffoldGeneric(m,patt)
+        #print '1re:',re
+        try:
+            re , mapping = is_substructure_mol(m, patt)
+        except:
+            return -999
+        #print re,mapping
+        #map_dic = mapping[0]
+        #print '2re:',re,mapping[0]
+       
+        re, mapping = select_mapping(re,mapping,Terminal_Scaffold_idx)
+        map_dic = mapping[0]
+        #print re,map_dic
+
+        #####################################################################
+        ## Case 1. There is more than two same rings of which is terminal ring in ligand
+        ## Romve the scaffold which is terminal scaffold 
+
+        # Convert the tuple 're' as list 're' to remove terminal ring
+        lst_re = []
+        for are in re:
+            tmp_re = list(are)
+            #print(tmp_re)
+            tmp_re.sort()
+            lst_re.append(tmp_re)
+        #print 'lst_re:',lst_re
+
+        lst_re2 = copy.deepcopy(lst_re)
+
+        # Check whether matching index is in terminal ring or not
+        if len(re)>=2:
+            tmp_re = list(re)
+            #print lst_re,re,type(re),'HIHIHIHI'
+            for aidx in lst_re:
+                if aidx in Terminal_Scaffold_idx:
+                    #print 'Terminal scaffold index:',aidx
+                    lst_re2.remove(aidx)
+        #print 'list_re2:',lst_re2
+
+        # Convert the list_re2 as tuple re
+        #print re
+        re = tuple()
+        for are in lst_re2:
+            atp = tuple(are)
+            #print atp
+            re =re + (atp,)
+        #print 'Re:',re
+        #return
+        ## End Case 1. ########################################################
+
+
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        #print 'At Ring match index: ', match_list
+        #return
+
+        #### - For editiing attach hand
+        #print patt
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #return
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print 'atom index:',atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #print 'brench dff:',brench_diff
+                    '''
+                    for idx in range(0,brench_diff):
+                        print idx
+                    '''
+
+                    brench = brench + brench_diff
+                    #brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=list(nei_atom_idx - atom_set)
+                    #print 'nei_idx:',is_idx
+                    for tidx in range(0,brench_diff):
+                        ais_idx = is_idx.pop()
+                        #print tidx,'ais_idx:',ais_idx
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
+             
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'i:',i,'ire',ire
+                        try:
+                            bre = mw.AddBond(map_dic[atom_idx],ire,btype)
+                        except:
+                            return -1
+                        #bre = mw.AddBond(i,ire,btype)
+                        #print 'bre:',bre
+                        #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    # For merage 
+    #print 'In3',list_re,len(list_re)
+    if len(list_re)>1:
+        merged_smi = Merge_Scaffold(t_df,list_re)
+        #Attach_hand(m,merged_smi)
+        #print 'merger_smi:',merged_smi
+        list_re = Attach_hand_2(m,merged_smi)
+        #return list_re
+    else:
+        pass
+
+    return list_re
+
+
+
+
+def Extract_Inner_Scaffold_6(asmi):
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    try:
+        my_smi = Make_Canonical_SMI(asmi)
+        #print 'Canonical SMI:',my_smi
+    except:
+        return -1
+
+    m = Chem.MolFromSmiles(my_smi)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+    SSSR_idxs = Extract_SSSR_Idx_RDkit(m)
+    #print SSSR_idxs
+    #return
+
+    '''
+    print dic_atom_neig_idx
+    print
+    print dic_atom_neig_sym
+    print 
+    print dic_atom_sym
+    print
+    '''
+
+    #return
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+
+    #### - Make the index list and mapping dic for a smiles: 2021.10.01
+    df = Make_Scaffold_Index(m,df)
+
+    ##### Check Point ####
+    #print df[['smiles','MIdx']]
+    #return
+
+    ##### -  Result of sng for use later
+    t_df = copy.deepcopy(df)
+
+    #print df[['smiles','MIdx']]
+    #return
+
+    # Error in RDKir and return -1
+    if type(df) == int:
+        return -1
+
+    #print df
+    #return
+
+    #### - Remove scaffolds which connected with bond like Ring-Ring, Ring-Ring-Ring
+    #### - Leave the scaffold: a ring or a scaffold
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+
+    ##### Check Point ####
+    #print df[['smiles','MIdx']]
+    #return
+
+    tmp_df = copy.deepcopy(df)
+
+    #### - Remove a index of ring which is part of fusion ring
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1],row[2]
+        #p_mol = Chem.MolFromSmiles(row[1])
+        #patt = Chem.MolFromSmiles(row[1])
+        re_fusion = Is_Part_Of_Fusion_Ring(SSSR_idxs,dic_atom_neig_idx,row[2])
+
+        #print re_fusion
+        # '1' means a part of fusion ring
+        if re_fusion == 1:
+            #print row[2]
+            df = df.drop(df[df.MIdx == row[2]].index)
+        # not a part of fusion ring    
+        else:
+            pass
+
+    #print 'Resut of removing dependency'
+    #print df 
+
+    ##### Check Point ####
+    #print df[['smiles','MIdx']]
+    #return
+
+
+    tmp_df = copy.deepcopy(df)
+    #print tmp_df
+    #return
+    #### - Making the terminal ring index and remove terminal ring
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1],row[2]
+        re = Is_terminal_Ring_3(m,row[2],dic_atom_neig_idx)
+        #print 're:',re
+
+        # '1' means that the ring is terminal node 
+        if re == 1:       
+            #df = df.drop(df[df.smiles==row[1]].index)
+            df = df.drop(df[df.MIdx == row[2]].index)
+
+    #print 'Scaffold:' 
+
+    ##### Check Point ####
+    #print df[['smiles','MIdx']]
+    #return  
+
+
+    if len(df) == 0:
+        #print 'There is no inter-connected ring'
+        return 0
+
+
+    tmp_df = copy.deepcopy(df)
+    list_re =[]
+    #print tmp_df
+
+    #### - Add the hand to the scaffold
+
+    #### rings in the tmp_df are passed. so need the index set
+    #### for more than one scaffold!!! use later
+    #print SSSR_idxs
+    total_index =set()
+    for index,row in tmp_df.iterrows():
+        #print 'In add hand:orig:',row[0],row[1],row[2],row[3]
+        p_smi = row[1]
+        match_list = row[2]
+        map_dic = row[3]
+        # Test
+        '''
+        if p_smi == 'c1ccnc2[nH]ncc12':
+            p_smi = 'c1ccnc2Nncc12'
+        '''
+    
+        patt = Chem.MolFromSmiles(p_smi)
+        #patt = Chem.RemoveHs(patt)
+       
+
+        total_index.update(match_list)
+
+        #print 'match list:',match_list
+        #continue
+        mw = Chem.RWMol(patt)
+        atom_list = list(match_list)
+        atom_set = set(match_list)
+        #print atom_list,atom_set
+        #Show_Index_Information(p_smi)
+
+        list_re_tmp =[]
+        brench = 0
+        for atom_idx in atom_list:
+            #print 'atom index:',atom_idx
+            nei_atom = dic_atom_neig_sym[atom_idx]
+            nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+            #print nei_atom,nei_atom_idx
+
+            if len(nei_atom_idx - atom_set) != 0:
+                brench_diff = len(nei_atom_idx - atom_set)
+                #print 'brench dff:',brench_diff
+                brench = brench + brench_diff
+                #print 'neighbor atom list index:',nei_atom_idx
+                is_idx=list(nei_atom_idx - atom_set)
+                #print 'nei_idx:',is_idx
+                for tidx in range(0,brench_diff):
+                    ais_idx = is_idx.pop()
+                    #print tidx,'ais_idx:',ais_idx
+                    #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                    btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                    atype = dic_atom_sym[ais_idx]
+         
+                    atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                    #print 'atomic num:',m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+
+                    #print 'Hi',atom_idx,is_idx,btype,atype
+                    ire = mw.AddAtom(Chem.Atom(atom_num))
+                    #print '   atom_idx:',atom_idx,'corresp:,',map_dic[atom_idx],'ire:',ire
+                    atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                    try:
+                        bre = mw.AddBond(map_dic[atom_idx],ire,btype)
+                    except: 
+                        print 'Eorror in attaching hand'
+                        return -1
+        #print 'brench:',brench 
+        try:
+            #Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print 'list_re:',list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    # For merage 
+    #print 'In3',list_re,len(list_re)
+    #t_df = copy.deepcopy(df)
+    #print total_index
+    if len(list_re)>1:
+        merged_smi = Merge_Scaffold(t_df,list_re,total_index)
+        #Attach_hand(m,merged_smi)
+        #print 'merger_smi:',merged_smi
+        list_re = Attach_hand_2(m,merged_smi)
+        #return list_re
+    else:
+        pass
+
+    return list_re
+
+
+
+def Extract_SSSR_Idx_RDkit(rdmol):
+
+    tmp_list = []
+
+    sssr = Chem.GetSymmSSSR(rdmol)
+    for aridx in sssr:
+            tlist = list(aridx)
+            tlist.sort()
+            tmp_list.append(tlist)
+        
+    return tmp_list
+
+
+
+def Is_Part_Of_Fusion_Ring(SSSR_idxs,dic_atom_neig_idx,mlist):
+   
+    #print type(mlist),mlist
+    #print 'SSSR_idxs:',SSSR_idxs
+    #print dic_atom_neig_idx
+
+    tmp_set = set()
+    for amidx in mlist:
+        tmp_idx = dic_atom_neig_idx[amidx]
+        for aidx in tmp_idx:
+            if aidx not in mlist:
+                tmp_set.add(aidx)
+
+    #print tmp_set
+
+    #Check tmp_set for SSSR
+    ln_re_intersection = 0
+    for aSSSR in SSSR_idxs:
+        aSSSR_Set = set(aSSSR)
+        re_intersecton = aSSSR_Set.intersection(tmp_set)
+        #print 'intersection:',re_intersecton 
+        ln_re_intersection = len(re_intersecton)
+        # a part of fusion ring
+        if ln_re_intersection >=2:
+            return 1
+        
+    #print
+    # Not part of fusion ring
+    if ln_re_intersection <2:
+        return -1
+
+
+
+def Make_Scaffold_Index(rdmol,df):
+    #print(df)
+   
+    T_re = []
+    for row in df.itertuples():
+        #print 'row:',list(row)
+        try:
+            p_smi = Make_Canonical_SMI(row[2])
+        except:
+            print 'Error in making canonical smi'
+            return -1
+        try:
+            patt = Chem.MolFromSmiles(p_smi)
+            '''
+            print p_smi
+            idx =0
+            for atom in patt.GetAtoms():
+                print idx, atom.GetSymbol()   
+                idx+=1
+           '''
+        except:
+            print 'Error in Mol from smiles'
+            return -1
+        try:
+            re , mapping = is_substructure_mol(rdmol, patt)
+        except:
+            print 'Error in is_substructure_mol'
+            return -1 
+        #print p_smi, re, mapping
+
+        idx =0 
+        for are in re:
+            #print are
+            tmp_re = []
+            tmp_re= [row[1]] #list(row[1])
+            tmp_re.append(p_smi)
+            tmp_re.append(are)
+            tmp_re.append(mapping[idx])
+            idx+=1
+            T_re.append(tmp_re)
+
+    df = pd.DataFrame.from_records(T_re,columns=['Ring_Num','smiles','MIdx','Map_Dic'])
+    df = df.sort_values(by=['Ring_Num'],ascending=True)
+    #print df[['smiles','MIdx']]
+    df = df.sort_values('Ring_Num', ascending=True).drop_duplicates('MIdx')
+    #print df[['smiles','MIdx']]
+    return df 
+
+
+def select_mapping(re,mapping,Terminal_Scaffold_idx):
+
+    #print 'select_mapping re:',re 
+    #print 'select_mapping mapping:', mapping
+    #print 'select_mapping terminal idx:',Terminal_Scaffold_idx
+
+    tmp_re = list(copy.deepcopy(re))
+    re_list = list(re)
+
+    i=0
+    for are in tmp_re:
+        are_list = list(are)
+        #print are_list 
+        if are_list in Terminal_Scaffold_idx:
+            del re_list[i]
+            del mapping[i] 
+        i+=1
+
+    #print re_list
+    #print mapping
+    #print 'HIHI'
+    
+    return tuple(re_list),mapping
+
+
 def Attach_hand(m,smi):
     
     p_smi = Make_Canonical_SMI(smi)
-    #print p_smi
+    print p_smi
     patt = Chem.MolFromSmiles(p_smi)
     sma = Chem.MolToSmarts(patt)
     patt_1 = Chem.MolFromSmarts(sma)
     match_list = m.GetSubstructMatches(patt_1)
-    #print match_list
+    
+    print 'attach_hand:',match_list
 
     if len(match_list) == 0:
         core = MurckoScaffold.GetScaffoldForMol(m)
@@ -4177,7 +4882,130 @@ def Attach_hand(m,smi):
         list_re.append(list_re_tmp)
         return list_re
 
-def Merge_Scaffold(t_df,list_re):
+
+def Attach_hand_2(m,smi):
+    try:
+        p_smi = Make_Canonical_SMI(smi)
+    except:
+        return 2
+    #print p_smi
+    patt = Chem.MolFromSmiles(p_smi)
+    sma = Chem.MolToSmarts(patt)
+    patt_1 = Chem.MolFromSmarts(sma)
+    match_list = m.GetSubstructMatches(patt_1)
+    #print match_list
+   
+
+    #Show_Index_Information(p_smi)
+    #return
+
+    map_dic = {}
+
+    re,mapping = is_substructure_mol(m, patt_1)
+    map_dic = mapping[0]
+    match_list = re
+    #print re,map_dic
+
+    if len(match_list)==0:
+        re,mapping = is_substructure_mol(m, patt_1)
+        #print re,mapping
+        if len(re)==1:
+            map_dic = mapping[0]
+            #print 'ok'
+
+        #print 'In attach_hand:',re
+        if len(re)!=0:
+            match_list = re
+
+    #print 'attach_hand:',match_list
+
+    if len(match_list) == 0:
+        core = MurckoScaffold.GetScaffoldForMol(m)
+        t_smi = Chem.MolToSmiles(core)
+        #print t_smi
+        core1 = MurckoScaffold.GetScaffoldForMol(patt)
+        match_list = core.GetSubstructMatches(core1)
+        #print match_list 
+        m = core
+        smi = p_smi
+
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    mw = Chem.RWMol(patt)
+    list_re_tmp =[]
+    if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+
+            i = 0
+            brench = 0
+
+            for atom_idx in atom_list:
+                #print atom_idx
+                if m.GetAtomWithIdx(atom_idx).IsInRing():
+                    pass
+                    #print 'In Ring',atom_idx
+                else:
+                    # In case of out ring atom, pass the brench check
+                    #print 'Out Ring',atom_idx
+                    #i+=1
+                    continue
+                    
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+                
+                # Check a atome has out node
+                if len(nei_atom_idx - atom_set) != 0:
+                    #print atom_idx,map_dic[atom_idx]
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #brench +=1 
+                    brench = brench + brench_diff
+                    #print 'Hi',nei_atom_idx
+                    is_idx=list(nei_atom_idx - atom_set)
+                    #print 'Hi',is_idx
+                    for tidx in range(0,brench_diff):
+                        ais_idx = list(is_idx).pop()
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
+             
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'ire:',ire
+                        #print i,ire
+                        bre = mw.AddBond(map_dic[atom_idx],ire,btype)
+                        #print 'bre:',bre
+                        #print 
+                i+=1 
+    list_re = []
+    try:
+        Chem.SanitizeMol(mw)
+        asmi = Chem.MolToSmiles(mw)
+        #print asmi
+        list_re_tmp.append(asmi)
+        list_re_tmp.append(smi)
+        list_re_tmp.append(brench)
+        list_re.append(list_re_tmp)
+        return list_re
+    except:
+        list_re_tmp.append(0)
+        list_re.append(list_re_tmp)
+        return list_re
+
+
+
+def Merge_Scaffold(t_df,list_re,total_index):
+
+    #print t_df[['smiles','MIdx']]
+    #print total_index
+
     tmp_list = []
     t_num_ring=0
     for alist in list_re:
@@ -4191,25 +5019,15 @@ def Merge_Scaffold(t_df,list_re):
         num_ring = len(list_ring)
         t_num_ring = t_num_ring+num_ring
 
-    #print t_num_ring
-    #ps_list = powerset(tmp_list)
-    #print tmp_list
 
     tmp_df = t_df[t_df.Ring_Num == str(t_num_ring)]
-    #print tmp_df
+    #print tmp_df[['smiles','MIdx']]
+
     for row in tmp_df.itertuples():
-        asmi = row[2]
-        maFR = Chem.MolFromSmiles(asmi)
-        yes_count=0
-        for as_smiles in tmp_list:
-            maOR = Chem.MolFromSmiles(as_smiles)
-            #print asmi
-            if maFR.HasSubstructMatch(maOR):
-                #print as_smiles,yes_count
-                yes_count+=1
-            if len(tmp_list) == yes_count:
-                #print asmi
-                return asmi
+        midx = row[3]
+        #print 'midx:',midx
+        if len(total_index-set(midx))==0:
+            return row[2]
 
 
 
@@ -4333,32 +5151,64 @@ def Is_terminal_Ring(rdmol,asmi,dic_atom_neig_idx):
 
 
 
-def Is_terminal_Ring_2(rdmol,asmi,dic_atom_neig_idx):
+def Is_terminal_Ring_3(rdmol,Midxs,dic_atom_neig_idx):
+
+
+    #print 'Is terminal:',type(Midxs),Midxs
+
+    atom_list = list(Midxs)
+    brench = 0
+    for atom_idx in atom_list:
+        nei_atoms = dic_atom_neig_idx[atom_idx]
+        for anei_atom in nei_atoms:
+            b_type = rdmol.GetBondBetweenAtoms(atom_idx,anei_atom).GetBondType()
+            if b_type != Chem.rdchem.BondType.DOUBLE:
+                if anei_atom not in atom_list:
+                    brench+=1
+    #print 'brench:',brench
+
+    if brench <=1:
+        return 1
+    else:
+        return -1
+
+
+
+def Is_terminal_Ring_2(rdmol,Midxs,dic_atom_neig_idx):
 
     ''' 
     ssr = Chem.GetSymmSSSR(rdmol)
     for aring in range(0,len(ssr)):
         print list(ssr[aring])
     '''
+    
 
+    '''
     #p_smi = Make_Canonical_SMI(asmi)
     #print 'p_smi:',p_smi
     patt1 = Chem.MolFromSmiles(asmi)
     #patt1 = Chem.MolFromSmiles(p_smi)
-    '''
-    sma = Chem.MolToSmarts(patt1)
-    patt = Chem.MolFromSmarts(sma)
-    '''
+    
+    patt1 = Chem.MolFromSmiles(asmi)
     match_list = rdmol.GetSubstructMatches(patt1)
+    #print 'match_list :',match_list
+    
+
+    if len(match_list) == 0:
+        re, mapping = is_substructure_mol(rdmol, patt1)
+        if re == -1 and mapping ==-1:
+            return -999
+
+        match_list = re
+        #print 'Is_terminal_Ring_2: ',type(match_list),match_list
+
 
     ssr = Chem.GetSymmSSSR(patt1)
     #ln_ring_asmi = len(ssr)
     #for aring in ssr:
         
 
-
     if len(match_list)==0 and len(ssr)>=2:
-
         re = Matching_Using_MakeScaffoldGeneric(rdmol,patt1)
         match_list2 = []
         if re == -1:
@@ -4366,50 +5216,138 @@ def Is_terminal_Ring_2(rdmol,asmi,dic_atom_neig_idx):
         else:
             match_lsit2 = re
 
-        '''
-        # Test_Code: Matching using MakeScaffoldGeneric
-        core = MurckoScaffold.GetScaffoldForMol(rdmol)
-        fw = MurckoScaffold.MakeScaffoldGeneric(core)
-        #gf = Chem.MolToSmiles(fw)
-        #print gf
-
-        #patt_2 = MurckoScaffold.GetScaffoldForMol(patt1)
-        #patt_g = MurckoScaffold.MakeScaffoldGeneric(patt_2)
-        patt_g = MurckoScaffold.MakeScaffoldGeneric(patt1)
-        match_list2 = fw.GetSubstructMatches(patt_g)
-        #gf2 = Chem.MolToSmiles(patt_g)
-        #print 'gf2:',gf2
-        #print match_list2
-        '''
         if len(match_list2)!=0:
             match_list = match_list2
 
-    #print match_list
 
+    #print 'HIHI',asmi,match_list
+    '''
+
+    #print 'Is terminal:',type(Midxs),Midxs
+
+    atom_list = list(Midxs)
+    brench = 0
+    for atom_idx in atom_list:
+        nei_atoms = dic_atom_neig_idx[atom_idx]
+        for anei_atom in nei_atoms:
+            b_type = rdmol.GetBondBetweenAtoms(atom_idx,anei_atom).GetBondType()
+            if b_type != Chem.rdchem.BondType.DOUBLE:
+                if anei_atom not in atom_list:
+                    brench+=1
+    #print 'brench:',brench
+
+    if brench <=1:
+        return 1
+    else:
+        return -1
+
+
+    '''
+    re_brench=[]
     if len(match_list)!= 0:
+        brench = 0
         for alist in match_list:
-            X = list(match_list)
-            atom_list = list(X[0])
+            X = list(alist)
+            atom_list = list(X)
             #print atom_list
-            brench = 0
+            #print alist
+            reFusion = Is_Ring_In_Fusion(rdmol,atom_list,dic_atom_neig_idx)
+            #print 'Is_Ring_In_Fusion:', reFusion
+            if reFusion == 1:
+                #print 'In Fusion'
+                continue
+            #sys.exit(1)
+            #brench = 0
             for atom_idx in atom_list:
                 #print atom_idx,len(dic_atom_neig_idx[atom_idx]), dic_atom_neig_idx[atom_idx]
                 nei_atoms = dic_atom_neig_idx[atom_idx]
                 for anei_atom in nei_atoms:
-                    if anei_atom not in atom_list:
-                        brench+=1
-        #print 'the number of brench:',brench
-        if brench == 1:
-            return -1
-        else:
-            #print '1'
+                    #print atom_idx,anei_atom
+                    b_type = rdmol.GetBondBetweenAtoms(atom_idx,anei_atom).GetBondType()
+                    #print type(b_type),b_type
+                    if b_type != Chem.rdchem.BondType.DOUBLE:
+                        if anei_atom not in atom_list:
+                            brench+=1
+            #print
+
+            #print 'brench:',brench
+            #print 'the number of brench:',brench
+            tmp_re=[]
+
+            # 1 means terminal node
+            if brench == 1:
+                tmp_re.append(1)
+                tmp_re.append(alist)
+                re_brench.append(tmp_re)
+            else:
+                #print '1'
+                tmp_re.append(-1)
+                tmp_re.append(alist)
+                re_brench.append(tmp_re)
+            brench=0
+            #print re_brench
+
+        #print 're brench:',re_brench,'\n' 
+        if len(re_brench)==0:
             return 1
+
+        if len(re_brench)==1:
+            return re_brench[0][0]
+        else:
+            for are in re_brench:
+                re_b=are[0]
+                if re_b == 1:
+                    re_b ==1
+            # if all ring are terminal ring
+            if re_b == 1:
+                return 1
     else:
         #print '0'
         return 0
 
-    return
+    return re_brench
+    '''
 
+
+
+def Is_Ring_In_Fusion(m,idx_list,dic_atom_neig_idx):
+
+    R_count=0
+    #print 'idx_list:',idx_list
+    idx_set = set(idx_list)
+
+    total_diff_list =[]
+    for aidx in idx_list:
+        nei_idx_list = dic_atom_neig_idx[aidx]
+        #print nei_idx_list,idx_set 
+        diff_list = list(set(nei_idx_list)-idx_set)
+        #print 'diff_list:',diff_list
+        if len(diff_list)>0:
+            #print diff_list[0]
+            total_diff_list.append(diff_list[0])
+            
+    #print 'total_diff_list:',total_diff_list
+    re = Check_Common_Index_In_ARing(m,total_diff_list)
+    #print 'Is fusion?:',re,'\n\n\n'
+    if re == 1:
+        return 1
+    else:
+        return -1
+
+
+def Check_Common_Index_In_ARing(m,idx_list):
+
+    ssr = Chem.GetSymmSSSR(m)
+    for aring in ssr:
+        #print 'ring list:',list(aring)
+        #a= set(idx_list)-set(list(aring))
+        inter_s= set(idx_list).intersection(set(list(aring)))
+        #print 'In Check_Common_Index_In_ARing:a',inter_s
+        # 1 is fusion ring
+        if len(inter_s)>=2:
+            return 1
+    # -1 is not fusion ring    
+    return -1
 
 
 def Extract_Atom_Neighbors(m):
@@ -4489,9 +5427,9 @@ def Is_Fusion_Ring(asmi):
     #print tmp_set
 
     df = Extract_SubScaffold(asmi)
-    #print df
+    print df
     t_smi = ''
-
+    re_list =2
     if len(tmp_set)>0:
         #tmp_df = df.loc[df['Ring_Num']==str(2)]
         tmp_df = df[df['Ring_Num']==str(2)]
@@ -4569,6 +5507,7 @@ def Check_Ring_Total_Ring_Num(smi):
 def Less_Than_Two_Ring(smi):
 
     num_ring = Check_Ring_Total_Ring_Num(smi)
+    #print num_ring
 
     if num_ring == 1:
         df = Extract_SubScaffold(smi)
@@ -4703,6 +5642,273 @@ def Check_Same_Scaffold(ssmi,tsmi):
     '''
 
 
+def topology_from_rdkit(rdkit_molecule):
+
+    topology = nx.Graph()
+    for atom in rdkit_molecule.GetAtoms():
+        # Add the atoms as nodes
+        topology.add_node(atom.GetIdx())
+
+        # Add the bonds as edges
+        for bonded in atom.GetNeighbors():
+            topology.add_edge(atom.GetIdx(), bonded.GetIdx())
+
+    return topology
+
+
+def is_isomorphic(topology1, topology2):
+    return nx.is_isomorphic(topology1, topology2)
+
+
+def Make_Adjacency_Matrix(m):
+    
+    #smi = Make_Canonical_SMI(smi)
+    #m = Chem.MolFromSmiles(smi)
+    try:
+        ln_smi = m.GetNumAtoms()
+    except:
+        return -1
+    npa = np.zeros((ln_smi,ln_smi))
+
+    '''
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    print dic_atom_neig_idx
+    print
+    print dic_atom_neig_sym
+    print 
+    print dic_atom_sym
+    print
+    '''
+
+    for atom in m.GetAtoms():
+        for bond in atom.GetNeighbors():
+            #print atom.GetIdx(),bond.GetIdx()
+            npa[atom.GetIdx()][bond.GetIdx()]=1
+            npa[bond.GetIdx()][atom.GetIdx()]=1
+
+    #print npa
+    #print npa.shape
+    #print type(npa)
+    return npa
+
+
+
+def Add_Node_Attribute(G,mol):
+    
+    for atom in mol.GetAtoms():
+        #G.nodes[atom.GetIdx()]['atom']=atom.GetAtomicNum()
+        G.nodes[atom.GetIdx()]['atom']=atom.GetSymbol()   
+
+    return G
+
+
+
+def Match_Subgraph(tnp,tmol,pnp,pmol):
+
+    #G1 = nx.from_numpy_matrix(np.array(a), create_using=nx.MultiGraph())
+    #G2 = nx.from_numpy_matrix(np.array(b), create_using=nx.MultiGraph())
+
+    #print a,b
+    GT = nx.from_numpy_matrix(tnp)
+    GT = Add_Node_Attribute(GT,tmol)
+
+    GP = nx.from_numpy_matrix(pnp)
+    GP = Add_Node_Attribute(GP,pmol)
+
+    #print 'G1 Node:',G1.nodes()
+    #print nx.get_node_attributes(G1,'atom')
+
+    #print 'G2 node:',G2.nodes()
+    #print nx.get_node_attributes(G2,'atom')
+
+
+    GM = isomorphism.MultiGraphMatcher(GT,GP)
+    #GM = isomorphism.MultiGraphMatcher(G1,G2,edge_match=lambda x, y: x[0]['weight'] == y[0]['weight'] )
+    print(GM.subgraph_is_isomorphic())
+    #print(GM.mapping)
+
+    
+    key_list = []
+    tmp_list = []
+    map_dic_list = []
+
+    for mapping in GM.subgraph_isomorphisms_iter():
+        print mapping
+        #print type(mapping)
+        keys = mapping.keys()
+        keys.sort()
+        #print keys
+        if keys not in key_list:
+            key_list.append(keys)
+            tkeys = tuple(keys)
+            #print tkeys
+            tmp_list.append(tkeys)
+            map_dic_list.append(mapping)
+        #print
+    #print key_list
+    #print tmp_list
+    re_list = tuple(tmp_list)
+    #print re_list 
+
+    #GM = isomorphism.MultiGraphMatcher(G2,G1)
+    #GM = isomorphism.MultiGraphMatcher(G1,G2,edge_match=lambda x, y: x[0]['weight'] == y[0]['weight'] )
+    #print(GM.subgraph_is_isomorphic())
+    #print(GM.mapping)
+
+    return re_list,map_dic_list
+
+
+
+
+def Match_Subgraph_2(tnp,tmol,pnp,pmol):
+
+    GT = nx.from_numpy_matrix(tnp)
+    GT = Add_Node_Attribute(GT,tmol)
+
+    GP = nx.from_numpy_matrix(pnp)
+    GP = Add_Node_Attribute(GP,pmol)
+
+    #print nx.get_node_attributes(G1,'atom')
+    #print nx.get_node_attributes(G2,'atom')
+
+    GM = isomorphism.MultiGraphMatcher(GT,GP)
+    #GM = isomorphism.MultiGraphMatcher(G1,G2,edge_match=lambda x, y: x[0]['weight'] == y[0]['weight'] )
+    #print(GM.subgraph_is_isomorphic())
+    #print(GM.mapping)
+
+    if GM.subgraph_is_isomorphic() == False:
+        return [],[]    
+
+
+    key_list = []
+    tmp_list = []
+    map_dic_list = []
+
+    for mapping in GM.subgraph_isomorphisms_iter():
+        #print mapping
+        GT_atom,GP_atom = '',''
+        for key in mapping.keys():
+            #print key,GT.nodes[key],GT.nodes[key]['atom']
+            #print mapping[key],GP.nodes[mapping[key]]['atom']
+
+            # Compare the atom using node's attribute
+            if GT.nodes[key]['atom']!=GP.nodes[mapping[key]]['atom']:
+                break
+            else:
+                GT_atom=GT_atom+GT.nodes[key]['atom']
+                GP_atom=GP_atom+GP.nodes[mapping[key]]['atom']
+
+            #print GP_atom
+            if len(mapping.keys()) == len(GP_atom): 
+                #print GP_atom 
+                keys = mapping.keys()
+                keys.sort()
+                #print keys
+                if keys not in key_list:
+                    key_list.append(keys)
+                    tkeys = tuple(mapping.keys())
+                    tmp_list.append(tkeys)
+                    map_dic_list.append(mapping)
+    re_list = tuple(tmp_list)
+    return re_list,map_dic_list
+
+
+
+def is_substructure_smi(target_smi, pattern_smi):
+
+    try:
+        target_smi = Make_Canonical_SMI(target_smi)
+        target_mol = Chem.MolFromSmiles(target_smi)
+
+        #G1 = topology_from_rdkit(target_mol)
+        #print 'Test:',G1.nodes()
+
+        pattern_smi = Make_Canonical_SMI(pattern_smi)
+        pattern_mol = Chem.MolFromSmiles(pattern_smi)
+
+        #G2 = topology_from_rdkit(pattern_mol)
+        #print 'Test:',G2.nodes()
+        print target_mol, pattern_mol
+    except:
+        return -9
+
+    tnp = Make_Adjacency_Matrix(target_mol)
+    pnp = Make_Adjacency_Matrix(pattern_mol)
+
+
+    re,mapping = Match_Subgraph_2(tnp,target_mol,pnp,pattern_mol)
+    #print 'In is_substructure_smi:',re,mapping
+    #re,mapping = check_substructure_mol(re,mapping,target_mol, pattern_mol)
+    #print 'In is_substructure_smi:',re,mapping
+
+    return re,mapping
+
+
+
+def is_substructure_mol(target_mol, pattern_mol):
+
+    tnp = Make_Adjacency_Matrix(target_mol)
+    pnp = Make_Adjacency_Matrix(pattern_mol)
+
+    re,mapping = Match_Subgraph_2(tnp,target_mol,pnp,pattern_mol)
+    #print 'In is_substructure_smi:',re,mapping
+    #re,mapping = check_substructure_mol(re,mapping,target_mol, pattern_mol)
+    #print 'In is_substructure_smi:',re,mapping
+
+    return re,mapping
+
+
+
+def check_substructure_mol(re_list,mapping,target_mol, pattern_mol):
+
+
+    ###### !!!!! Not use !!!!!! #########
+
+    # Compare the target atom and pattern atom using circular string matching
+    tmp_re = list(copy.deepcopy(re_list))
+    tmp_mapping = []
+    #print 'tmp_re: type:',type(tmp_re)
+
+    # For Pattern Atom
+    if len(re_list)<=1:
+        return re_list,mapping
+    ln_pattern = pattern_mol.GetNumAtoms()
+    patom=''
+
+    # if pattern is single ring, check for the many single ring
+    if ln_pattern <=6:
+        for aidx in range(0,ln_pattern):
+            patom=patom+pattern_mol.GetAtomWithIdx(aidx).GetSymbol()
+        #print '  check_substructure_mol_pattern:', patom   
+
+        # For Target Atom
+        mapping_idx=0
+        for are in re_list:
+            tatom=''
+            for aidx in are:
+                tatom=tatom+target_mol.GetAtomWithIdx(aidx).GetSymbol()
+            #print '  check_substructure_mol_target:', tatom   
+            m_re = [m.group(0) for m in re.finditer(patom, tatom+tatom) if m.start() < len(tatom)]
+            #print m_re
+            if len(m_re)==0:
+                tmp_re.remove(are)
+            else:
+                tmp_mapping.append(mapping[mapping_idx])
+            mapping_idx+=1
+
+        re_list = tuple(tmp_re)
+        mapping = tmp_mapping
+
+        return re_list, mapping 
+    # pattern is more than 2 ring, pass the re_list without checking
+    else:
+        return re_list,mapping
+
+
+
+
 def MD_Backbone_show():
     print '\'asmi\' means a smiles string'
     print 'Extract_BB(asmi),str'
@@ -4720,12 +5926,18 @@ def MD_Backbone_show():
     print 'Extract_Inner_Scaffold_3(asmi)' # if there is no interConnected Ring return '0' and merge two scafolds into one scafold
     print 'Extract_Inner_Scaffold_4(asmi)' # bug fix: if a ligand has more than two hands at a index -> correct the num. of hands
     print 'Make_Canonical_SMI(asmi),'
+    print 'topology_from_rdkit(rdkit_molecule),'
+    print 'Show_Index_Information(asmi),'
 
     return
+
+
 
 def main():
 
     # 2021.04.08.16:37
+
+    # m = Chem.MolFromSmiles(myMolecule)
 
     parser=argparse.ArgumentParser()
     #parser.add_argument('-t',required=True, choices=['l','f'], default='n',  help='Input type: list(csv) or files(smi).')
@@ -4772,28 +5984,142 @@ def main():
 
     # Test
     #smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
-    smi = 'O=C1NC(=O)[C@@](c2ccccc2)(C2CCCCC2)N1'
-    smi = 'COCCSCCCSc1nnc(Cc2cccs2)n1C1CC1'
-    
-   
-    asmi = Make_Canonical_SMI(smi)
-    pmol = readstring('smi',asmi)
-    asmi = pmol.write(format='smi')
-    pBB = Extract_BB(asmi)
-    #print pBB
+    smi = 'c1ccc(cc1)c3nc2ccccc2c(c3)C(=O)Nc5cnnc5(C(=O)NC4CCCC4)'
+    #smi = 'O=C1NC(=O)[C@@](c2ccccc2)(C2CCCCC2)N1'
+    #smi = 'COCCSCCCSc1nnc(Cc2cccs2)n1C1CC1'
+    smi = 'S(=O)(=O)(NC(=O)c1cc(c(Cc2c3c(n(c2)C)ccc(NC(=O)OC2CCCC2)c3)cc1)OC)c1c(C)cccc1'
+    smi = 'n1(n(c(c(c1=O)CC[S@](=O)c1ccccc1)O)c1ccccc1)c1ccccc1'
+    smi ='COc1ccc(c2cc(C(=O)[O-])nc3c2c(C)nn3c2ccccc2)cc1'
+    smi ='CC(C)n1c(=O)[nH]c2c(C(=O)N3CCC(Cc4ccccc4)CC3)snc2c1=O'
+    smi = 'COCC(=O)Nc1ccc2nc(N3CC[NH+](Cc4ccccc4F)CC3)cc(C(=O)[O-])c2c1'
+    smi = 'O=C1C=C(CNc2cccc(C(F)(F)F)c2)N[C@H]2N=C(c3ccccc3)NN12'
+    smi ='Oc1ccccc1c1nc2=c3cn[nH]c3=NCn2[nH]1'
+    smi ='COc1ccc(c2c3CNN=c3[nH]c3c2oc2cc(O)ccc32)c(OC)c1'
+    smi = 'CCn1cc(C[C@@H]2C(=O)Nc3ccccc23)c2ccccc12'
+    smi ='Cc1oc2c(c(C)cc3OC(=O)[C@H](CC(=O)Nn4cnnc4)[C@@H](C)c23)c1C'
+    smi = 'COc1ccc(c2cc(=O)c3c(OC)c(OC)c(OC)cc3o2)cc1O'
+    smi ='Cc1nnc(CSC2=N[C@H]3SC[C@H](c4ccccc4)[C@@H]3C(=O)N2Cc2ccccc2)o1'
+    smi ='CCn1cc(C(=O)NCc2cccnc2)c(=O)c2cc(S(=O)(=O)N3CCC(C)CC3)ccc12'
+    smi ='CCc1ccccc1NC(=O)[C@@H]1C=C2[C@H](S1)c1ccccc1OC2'
+    smi ='CC(C)(C)c1ccc(CN2[C@H](N)N(C[C@@H](O)COc3ccccc3)c3ccccc23)cc1'
+    smi ='Cc1cccc(C[N]23CN2[C@H](NC(=O)c2cc(c4ccncc4)nc4c(Cl)cccc24)N3)c1'
+    smi ='CCn1cc2c(n1)C(=O)N(c1ccccc1)[C@@H]1c3ccc(OC)c(OC)c3C(=O)N21'
+    smi ='C1C(=NN=C1NC(=O)c1ccc(cc1)N1CCN2[C@H](C1)C2)c1cccc(NS(=O)(=O)c2ccccc2)c1 '
+    smi = 'CCOC(=O)c1c(N)n(C2=N[C@@H](n3ncc(C(=O)OCC)c3N)c3c(N2)sc2c3CC(C)(C)OC2)nc1'
+    smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    smi ='O=C(CCC1CCN(c2cnc3ccccc3n2)CC1)NC[C@@H]1CCCO1'
+    smi ='CCc1ncc(C(=O)N2CCC([C@H]3NNC[C@@H]3c3cccc(F)c3)CC2)cn1'
+    smi = 'Cc1ccsc1[C@H]1Nc2ccc3ncccc3c2C2=C1C(=O)CCC2'
+    smi ='O=S(=O)(NNc1ccc(Br)cc1)[C@H]1CONC1'
+    smi = 'COc1ccc(c2cc(C(=O)[O-])nc3c2c(C)nn3c2ccccc2)cc1' ###############
+    #smi =  'COC(=O)c1cc(c2ccncc2)nc2c1c(=O)n(C)c(=O)n2CC(C)C'
+    #smi = 'CCN1CC(=O)Nc2cc(C(=O)Nc3cc(Cl)ccc3O)ccc12' ############
+    #smi ='CC(C)n1nc(O)c2c(c3coc4ccc(Cl)cc4c3=O)c3oc4c(O)c(O)ccc4c3nc12' ###################
+    smi = 'O=S(=O)(NNc1ccc(Br)cc1)[C@H]1CONC1'
+
+
+
+
+    smi1 = 'Cc1nn(C)cc1N' 
+    smi2 = 'C1CCCC1'
+    smi3 = 'O=C(NC1CNNC1)c1ccnc2ccccc12'
+
+    smi4 = 'C1CNNC1'
+    smi5 = 'C1CCCC1'
+    smi6 = 'C1CNCN1'
+    smi7 = 'C1CNNC1'
+    smi8 = 'c1ccccc1'
+    smi9 = 'C1CCCCC1'
+
+    #a,b =is_substructure_smi(smi, smi8)
+    #print a,b
     #return
 
 
-    if Check_Ring_Total_Ring_Num(pBB) <=2:
-        #print 'less than 2'
-        re = Less_Than_Two_Ring(pBB)
-        print re
+    '''
+    npa = Make_Adjacency_Matrix(smi)
+    npb = Make_Adjacency_Matrix(smi3)
+    Match_Subgraph(npa,npb)
+    return
+    '''
+
+
+    # Test
+    '''
+    f = Chem.CanonSmiles(smi)
+    f_mol = Chem.MolFromSmiles(f)
+    fg = topology_from_rdkit(f_mol)
+
+
+    #s = Chem.CanonSmiles(smi1)
+    s_mol = Chem.MolFromSmiles(smi1)
+    sg = topology_from_rdkit(s_mol)
+
+
+    print is_isomorphic(fg, sg)
+
+    #ismags = nx.isomorphism.ISMAGS(fg,sg)
+    #print ismags
+
+    GM = isomorphism.GraphMatcher(sg, fg)
+    GM = isomorphism.MultiGraphMatcher(sg, fg,edge_match=lambda x, y: x[0]['weight'] == y[0]['weight'] )
+    print GM.is_isomorphic()
+    '''
+
+    #return
+    #smi = 'O=C(CCc1ccccc1)NC(C(=O)NC(CCC2CC2)CC3CCCCC3)Cc4cnc[nH]4'
+    #smi = 'S(=O)(=O)(c1ccc(cc1)CCNC(=O)N1CC(=C(C1=O)CC)C)NC(=O)N[C@H]1CC[C@@H](CC1)C'
+    #smi = 'N1(CCN(CC1)c1c(cccc1)C)CCc1n2CCCCc2nn1' #OR <- rdkit error
+    smi = 'O=C(NCCc2c[nH]c1ccccc12)C4(CCCCc3ccccc3)(CCCC4)' #OK
+    smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    smi = 'S(=O)(=O)(NC(=O)c1cc(c(Cc2c3c(n(c2)C)ccc(NC(=O)OC2CCCC2)c3)cc1)OC)c1c(C)cccc1'
+    smi = 'COc1ccc(c2cc(C(=O)[O-])nc3c2c(C)nn3c2ccccc2)cc1'
+
+    lines =[]
+    ifile = args.i
+    if ifile == None:
+        lines.append(smi)
     else:
-        #print 'more than 2'
-        #re = Extract_Inner_Scaffold_2(pBB)
-        #print 'R2',re
-        re = Extract_Inner_Scaffold_4(pBB)
-        print 'R3',re
+        fp_for_in = open(ifile,'r')
+        lines = fp_for_in.readlines()
+        fp_for_in.close()
+
+    ln_line=len(lines)
+
+    count=1
+    for aline in lines:
+        if not aline.startswith('#'):
+            aline = aline.strip()
+            token = aline.split()
+            print str(count)+'/'+str(ln_line)+': Input SMI:',token[0]
+            asmi = Make_Canonical_SMI(token[0])
+            pmol = readstring('smi',asmi)
+            asmi = pmol.write(format='smi')
+            pBB = Extract_BB(asmi)
+            print '------> BB:',pBB
+            #return
+
+            if Check_Ring_Total_Ring_Num(pBB) <=2:
+                #print 'less than 2'
+                #print pBB
+                tmp_list =[]
+                tmp_list.append(pBB)
+                tmp_list.append(pBB)
+                tmp_list.append(0)
+                re_list =[]
+                #re = Less_Than_Two_Ring(pBB)
+                re_list.append(tmp_list)
+                print re_list
+            else:
+                #print 'more than 2'
+                #re = Extract_Inner_Scaffold_2(pBB)
+                #print 'R2',re
+                re = Extract_Inner_Scaffold_6(pBB)
+                print '*'*100
+                print '------>R3',re
+                print '*'*100
+                print '\n\n'
+        count+=1
 
     return
     #print re
@@ -4896,5 +6222,7 @@ if __name__=="__main__":
     # Ver 20210818, 'Extract_Inner_Scaffold_3(asmi) and Merge two scaffold into one scaffold!!!!'
     # Ver 20210831, 'modifiy the Extract_Inner_Scaffold_4(asmi) and add !!!!'
     # Ver 20210914, 'Bug Fix!'
+    # Ver 20210928, 'Using NetworkX, substructure-matching works good!
+    # Ver 20211004, 'completely reversion works perfect!
     main()
 

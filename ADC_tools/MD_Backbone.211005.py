@@ -1,8 +1,13 @@
-import glob,sys,os,random,argparse,subprocess,pickle
+import glob
+import sys,os
 from time import time
+import argparse
+import glob
+import os
+import subprocess
+import pickle
 from datetime import datetime
-import random
-from operator import itemgetter
+from os import path
 
 from rdkit import RDConfig
 from rdkit import Chem
@@ -10,6 +15,7 @@ from rdkit.Chem import Descriptors
 from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 from rdkit.Chem import ChemicalFeatures
+from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
 import multiprocessing
@@ -20,18 +26,8 @@ import copy
 import re
 import pandas as pd 
 import traceback
-import matplotlib
-import matplotlib.pyplot as plt
-# For background plotting
-matplotlib.use("Agg")
-plt.switch_backend("agg")
-from pybel import *
 
-# For Clustering
-from sklearn.cluster import DBSCAN
-from sklearn.preprocessing import StandardScaler
-from sklearn.manifold import spectral_embedding
-from scipy.cluster.hierarchy import dendrogram,linkage
+from pybel import *
 
 # For Database
 import sqlite3
@@ -46,27 +42,12 @@ from zipfile import ZipFile
 from StringIO import StringIO
 
 from multiprocessing import Process, current_process
-import shutil
+import pprint
 
-#For call user define function
-from ADC_tools.MD_Backbone import *
-from ADC_tools.MD_DB import *
-from ADC_tools.MD_Align import *
-from ADC_tools.MD_BA_class2 import *
-from ADC_tools.MD_Output import *
-from ADC_tools.MD_Cluster import *
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
+from MD_DB import *
+from MD_Align import *
+#java_path = "/lwork01/tools/jdk1.8.0_101/bin/"
+java_path = ""
 def featurize_atoms(mol):
     feats = []
     for atom in mol.GetAtoms():
@@ -589,7 +570,7 @@ def mol_scaffold_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     # read the sng output
     re_name=lid+'.tmp'
@@ -615,24 +596,7 @@ def mol_scaffold_extract(lid,amol):
     return scaffold_list
 
 
-
-def processing_backbone(scaffold_backbone):
-
-
-    type1 = '[*]'
-    type2 = '([*])'
-
-    old_backbone=scaffold_backbone
-    scaffold_backbone = scaffold_backbone.replace(type2,'')
-    scaffold_backbone = scaffold_backbone.replace(type1,'')
-    #print 'Before: '+old_backbone+' ---> After: '+scaffold_backbone
-
-    return scaffold_backbone
-
-
-
 def mol_scaffold_backbone_extract(lid,amol):
-
     
     # making smiles
     t_dir='./Data/BB/sng_tmp/'
@@ -651,7 +615,7 @@ def mol_scaffold_backbone_extract(lid,amol):
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','./Data/Sub_P/sng.jar','generate','-o', t_dir+lid+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
     #process.wait()
 
     # read the sng output
@@ -1809,7 +1773,7 @@ def sql_fetch_Main_S_Check_PCscore(ln_tmp_re_list,tmp_re_list,re_dic,re_list,OID
 
 
 #def Align3D(arg_t,re_dic,OID,zid,tmp_sdf):
-def OLD_Align3D(re_dic,OID,zid,tmp_sdf):
+def Align3D_IN(re_dic,OID,zid,tmp_sdf):
     
     path_template = './Data/BB/BackBone/'
     path_query    = './Data/3DAlign/Retrieval_MOL2_From_DB/'
@@ -2358,50 +2322,36 @@ def Make_BB(df,f_list):
     return df
 
 
-def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
+def Make_BB(asmi):
 
-    aidx=slist.index(casmi)
-    #return
-    asmi=casmi[0]
-    asmi_path=casmi[1]
-    #print asmi,asmi_path
-    #print '\n\nProcessing....:'+str(aidx+1)+'/'+str(ln_slist)+' ,mol:'+asmi 
-    print ' --> Processing....:'+str(aidx+1)+'/'+str(ln_slist)+' ,mol:'+asmi+'\r', 
-    sys.stdout.flush()
+    # File input and output version!
+    # Check the sng.jar exists or not!
+    if not os.path.exists('./sng.jar'):
+        print 'This python program needs \'sng.jar\'.'
+        print 'Move the \'sng.jar\' program at this fold and re excute this program.'
+        os.exit(1)
 
-    t_dir='./sng_tmp/' 
-
+    # File input and output version!
     proc = os.getpid()
     f_name=str(proc)+'.smi'
-    #proc_name = current_process().name
 
-    #print proc_name
-    #print proc,asmi,f_name
-    #return
-    
-    # write smiles
-    t_path=os.path.join(t_dir,f_name)
-    fp_for_out=open(t_path,'w')
+    fp_for_out=open(f_name,'w')
     fp_for_out.write(asmi)
     fp_for_out.close()
 
     # excuate sng
     FNULL = open(os.devnull, 'w')
-    subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+str(proc)+'.tmp',t_dir+f_name], stdout=FNULL, stderr=subprocess.STDOUT)
-    #subprocess.call(['java','-jar','sng.jar','generate','-o', t_dir+str(proc)+'.tmp',t_dir+f_name], stderr=subprocess.STDOUT)
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
 
     re_name=str(proc)+'.tmp'
-    t_path=os.path.join(t_dir,re_name)
-    fp_for_in=open(t_path,'r')
+    fp_for_in=open(re_name,'r')
     lines=fp_for_in.readlines()
     fp_for_out.close()
-    #print lines
 
     #########################################
     # Extract Backbone
     scaffold_backbone=''
     ln_lines=len(lines)
-
 
     #####################################################################
     # If there is no scaffolds, The Original structure is used as backbone.
@@ -2411,54 +2361,17 @@ def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
 
     if ln_lines>1:
         last_line=lines[ln_lines-1]
-        #print 'Test ',last_line
-        #scaffold_list.append(last_line)
-
         if ln_lines>2:
             token=last_line.split(',')
-            #print 'last: ',token[-2].strip()
             scaffold_backbone = token[-2].strip()
         if ln_lines==2:
             token=last_line.split()
-            #print token
-            #print token[-1]
-            #print 'last: ',token[-1][:-1].strip()
             scaffold_backbone = token[-1][:-1].strip()
-    #print 'Backbone: ',scaffold_backbone        
 
     scaffold_backbone = processing_backbone(scaffold_backbone)
-    #print 'Backbone:',scaffold_backbone
-    tmp_list=[scaffold_backbone,asmi,asmi_path]
-    Main_list.append(tmp_list)
-
-    '''
-    # Extract chemical perporty
-    tmp_list=[]
-    try:
-        amol = readstring('smi',scaffold_backbone)
-    except:
-        print '\nReading smiles Error :'+backbone
-        return
-
-    desc = amol.calcdesc(descnames=['MW', 'logP', 'HBA1', 'HBD','TPSA'])
-    #print desc
-    t= amol.sssr
-    Num_Ring = len(t)
-
-    tmp_list=[asmi,desc['MW'],desc['logP'],desc['HBA1'],desc['HBD'],desc['TPSA'],Num_Ring]
-    Main_list.append(tmp_list)
-    '''
-
-def processing_backbone(scaffold_backbone):
-
-    type1 = '[*]'
-    type2 = '([*])'
-
-    old_backbone=scaffold_backbone
-    scaffold_backbone = scaffold_backbone.replace(type2,'')
-    scaffold_backbone = scaffold_backbone.replace(type1,'')
-    #print 'Before: '+old_backbone+' ---> After: '+scaffold_backbone
-
+    os.unlink(f_name)
+    os.unlink(re_name)
+    
     return scaffold_backbone
 
 
@@ -2584,1505 +2497,404 @@ def Core_ExCP(ln_slist,slist,tmp_list,Main_list,Re_dic,ele):
     tmp_list=[]
 
     return
-def yklee_work_help():
-	print("""
-	=================================================================
-	#	About a_type : It is Working type                           #
-	=================================================================
-	#################################################################
-	# a_type == 0 : Tier 1 Exact Matching                           #
-	# a_type == 1 : Tier 1.5 Matching --> Inter-Ring Search Method  #
-	# a_type == 2 : Tier 1.6 Matching --> Backbone Alignment Method #
-    # a_type == 3 : ZINC_ADC Matching --> Extract ADC compound      #
-	# a_type == 4 : ZINC_ADC in Large DB --> Deep Search            #
-	#################################################################
-""")
-def test_work():
-        global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs,out_csv_path
-        T1_pcscore_cutoff = 0.98
-        ring_cutoff = 1
-        N_ZIDs_cutoff = 10000 #1500
-        global oPath,DB_Path
-        iPath = "./Data/Input/"
-        oPath = "./Data/ADC_Output/Files/"
-        rei_img_Path = "./Data/Re_Input/IMG/"
-        out_csv_path = "./Data/ADC_Output/"
-
-        #DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
-        #DB_Path = "/lwork02/yklee/DB_Table/"
-        DB_Path = "/ssd/yklee/DB_Table/"
-
-        TR_MW = 38.0
-        if os.path.exists(oPath):
-                pass
-        else:   
-                os.makedirs(oPath)
-
-        if os.path.exists(rei_img_Path):
-                pass
-        else:   
-                os.makedirs(rei_img_Path)
-
-        if_list = sorted(glob.glob(iPath + "*.smi"))
-	fif_list = []
-        if len(if_list) == 0:
-                print("No Input Files")
-                sys.exit(1)
-	for i in if_list:
-		returns = Check_input(i)
-		if returns == -1:
-			pass
-		else:
-			fif_list.append(returns)
-	print(fif_list)
-def Check_input(ainput):
-	asmi = Read_SMILES_FILE(ainput)
-        try :   
-        	rdmol = Chem.MolFromSmiles(asmi)
-        except: 
-                return -1
-	try:
-		obmol = readstring("smi",asmi)
-	except:
-		return -1
-        if rdmol is None or obmol is None:
-                return -1
-        else:
-		return ainput
-		"""
-		if Chem.GetSSSR(rdmol) <2:
-			pass
-		else:
-			#print(ainput)
-			return ainput"""
 
 
-def yklee_work(a_type):
-	global T1_pcscore_cutoff,N_ZIDs_cutoff,ZIDs,out_csv_path
-	T1_pcscore_cutoff = 0.98
-	ring_cutoff = 1
-	N_ZIDs_cutoff = 10000 #1500
-	global oPath,DB_Path
-	iPath = "./Data/Input/"
-	oPath = "./Data/ADC_Output/Files/"
-	rei_img_Path = "./Data/Re_Input/IMG/"
-	out_csv_path = "./Data/ADC_Output/"
 
-	#DB_Path = "/ssd/swshin/1D_Scan.v2/Data/DB_Table/"
-	#DB_Path = "/lwork02/yklee/DB_Table/"
-	DB_Path = "/ssd/yklee/DB_Table/"
-	
-	TR_MW = 38.0
-	if os.path.exists(oPath):
-		pass
-	else:
-		os.makedirs(oPath)
-	
-	if os.path.exists(rei_img_Path):
-		pass
-	else:
-		os.makedirs(rei_img_Path)
-	#remain_out = sorted(glob.glob(out_csv_path + "*.csv"))
-	if_list = sorted(glob.glob(iPath + "*.smi"))
-	if len(if_list) == 0:
-		print("No Input Files")
-		sys.exit(1)
-	
-	Main_list = []
-	re = []
-	sum_df = []
-	fif_list = []
-	
-	alp = 0
-	for i in if_list:
-		returns = Check_input(i)
-		if returns == -1 or returns is None:
-			pass
-		else:
-			fif_list.append(returns)
-	print(fif_list)
-	out_file1 = "./Data/ADC_Output/Out_Summary.csv"
-	out_file2 = "./Data/ADC_Output/Error_SMILES.txt"
-	for afile in fif_list:
-		alp += 1
-		M_MW = 0.1
-		ZIDs = []
-		asmi = Read_SMILES_FILE(afile)
-		Input_CP = Extract_CP(asmi)
+######################################################################################################
 
-		fn = os.path.basename(afile)
-		file_name = os.path.splitext(fn)[0]
-		##################
-		# Activaion Part #
-		##################
-		if a_type == 0:
-			bblist = working_a0(asmi,file_name)
-			if bblist == -1:
-				print("No ZIDs Match \nSMILES : %s"%asmi)
-				pass
-		elif a_type == 1:
-			bblist = working_a1(asmi,file_name,afile)
-			if bblist == -1:
-				print("No BB Match \nSMILES : %s"%asmi)
-				pass
-		elif a_type == 2:
-			total_df = working_a2(asmi,file_name,Input_CP)
-			if total_df.empty:
-				bblist = -1
-			else:
-				bblist = 1
-		elif a_type == 3:
-			total_df = working_ZDC2(asmi,file_name,afile,Input_CP) #working ZADC
-			if total_df.empty:
-				bblist = -1
-			else: 
-				bblist = 1
-		elif a_type == 4:
-			total_df = working_a4(asmi,file_name,afile,Input_CP)
-			if total_df.empty:
-				bblist = -1
-			else:
-				bblist = 1
-		elif a_type == 5:
-			total_df = Search_About_2DBs(asmi,file_name,afile,Input_CP)
-			if total_df.empty:
-				bblist = -1
-			else:
-				bblist = 1
-		else:
-			sys.exit(1)
+def Extract_CP(asmi):
 
-		######################
-		# Make Result Format #
-		######################
-		if bblist == -1:
-			pass
-		else:
-			if a_type == 0 or a_type == 1:
-				ZIDs,zdf = BB_Align_Class_Search(Extract_BB(asmi),asmi,file_name,bblist,ZIDs,N_ZIDs_cutoff)
-				if zdf.empty or zdf is None:
-					sum_df = pd.DataFrame()
-				else:
-					sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),zdf)
-			
-			else:
-				sum_df = Write_Out_Summary(file_name,Extract_BB(asmi),total_df)
-
-		################
-		# Make Summary #
-		################
-		if bblist == -1:
-			pass
-		else:
-			if sum_df.empty:
-				with open(out_file2,"a") as W:
-					W.write(file_name + "\t" + asmi + '\n')
-			else:
-				if not os.path.exists(out_file1):
-					sum_df.to_csv(out_file1,index=False,mode="w")
-				else:
-					sum_df.to_csv(out_file1,index=False,mode="a",header=False)
-
-def Fetch_SMILES_by_ID(zid,id_smi,DB_Path):
+    # Extract chemical perporty
+    tmp_list=[]
+    Re_dic={}
     try:
-        conn = sqlite3.connect(DB_Path + "./ZINC_CP_idx.db")
+        amol = readstring('smi',asmi)
     except:
-        print("DB Connection Error")
-        sys.exit(1)
-    cursorObj = conn.cursor()
-    try:
-        cursorObj.execute("SELECT SMILES FROM CP WHERE ZID=?",(zid,))
-    except:
-        print("Error %s"%zid)
-        sys.exit(1)
-    rows = cursorObj.fetchall()
-    smi = ''
-    if not rows:
-        pass
-    else:
-        smi = unicode.encode(rows[0][0],"utf-8")
-        id_smi[zid] = smi 
+        print '\nReading smiles Error :'+asmi
+        return tmp_list
 
-def working_a0(asmi,file_name):
-	######################
-	# Tier 1 Exact Match #
-	######################
-	tmp_list = []
-	id_smi = {}
-	re_list = set()
-	aBB = Extract_BB(asmi)
-	ZIDs = T1_Class_Search(aBB,file_name,m_type=1)
+    desc = amol.calcdesc(descnames=['MW', 'logP', 'HBA1', 'HBD','TPSA'])
+    t= amol.sssr
+    Num_Ring = len(t)
 
-	if ZIDs == -1:
-		return -1
-	else:
-		tmp_df = pd.DataFrame(ZIDs,columns=["ZID"])
-		tmp_df["Purchasability"] = "Purchasable"
-
-	for i in tmp_df["ZID"]:
-		id_smi = Fetch_SMILES_by_ID(i,id_smi,DB_Path)
-	for i in list(set(id_smi.values())):
-		re_list.add(Extract_BB(i)) # Backbone list
-
-	return list(re_list)
-def working_a1(asmi,file_name,afile):
-	######################################
-	# Tier 1.5 Match , Inter-Ring Search #
-	######################################
-	M_MW = 0.1
-	TR_MW = 38.0
-	Ok_flag = 0
-	idx = 0
-	aBB = Extract_BB(asmi) 
-	re_list = working_a0(asmi,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	Total_re_list = T15_Class_Search_yklee(afile,TR_MW,M_MW)
-	return Total_re_list
-def working_a1_deep(asmi,file_name,afile):
-	M_MW = 0.1
-	TR_MW = 38.0
-	OK_flag = 0
-	idx = 0
-	aBB = Extract_BB(asmi)
-	re_list = working_a0(asmi,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	Total_re_list = T15_Class_Search(afile,TR_MW,M_MW)
-	return Total_re_list
-def BB_Query_parameters(asmi,mw_percent):
-	omol = readstring("smi",asmi)
-	csmi = "C"*(len(omol.atoms)-4) + "NNOO"
-	CsmiCP = Extract_CP(csmi)
-	InputCP = Extract_CP(asmi)
-	tmp_li = [CsmiCP["MW"],InputCP["MW"]]
-
-	Input_Num_Ring = InputCP["Ring"]
-	Input_MW = np.float64(max(tmp_li))
-
-	per_MW = Input_MW*np.float64(mw_percent)/np.float64(100.0)
-	tper_MW = Input_MW*np.float64(mw_percent-1.0)/np.float64(100.0)
-	if mw_percent == 1.0:
-		up_MW = Input_MW + per_MW
-		low_MW = Input_MW - per_MW
-		return (low_MW,up_MW,Input_Num_Ring)
-
-	else:
-		uu_MW = Input_MW + per_MW
-		ul_MW = Input_MW + tper_MW
-
-		lu_MW = Input_MW - tper_MW
-		ll_MW = Input_MW - per_MW
-
-		return (ll_MW,lu_MW,ul_MW,uu_MW,Input_Num_Ring)
-def working_a2(asmi,file_name,InputCP):
-	df_list = []
-	df_list_t = []
-	df_list2 = []
-	df_list3 = []
-	pur_ls = []
-	#idid = []
-	t_idset = set()
-	id_BB = {}
-	re_list = []
-	t_smiset = set()
-	tier_list = []
-
-	BB_dic = {}
-	Osmi_dic = {}
-	df_list = []
-	aBB = Extract_BB(asmi)
-	out_csv_path = "./Data/ADC_Output/"
-	
-	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* "+ file_name
-	if not re_list :
-		re_list = working_a0(asmi,file_name)
-	elif re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	mw_percent = 1.0
-	break_flag = 0
-	n_bbs = 0
-	while break_flag == 0:
-		query_entities = BB_Query_parameters(asmi,mw_percent)
-		break_flag,n_bbs = Fetch_PBB_BY_MW_RingNum_temp(BB_dic,Osmi_dic,query_entities,mw_percent,n_bbs,DB_Path)
-		mw_percent += 1.0
-	lenid = len(BB_dic)//9
-
-	div_keys = list(divide_list(BB_dic.values(),lenid))
-	div_ids = list(divide_list(BB_dic.keys(),lenid))
-	a = 0
-	for ids,keys in zip(div_ids,div_keys):
-		a += 1
-		smiles = []
-		Align_DF = AlignM3D(file_name,aBB,ids,keys)
-		for i in Align_DF["Query"]:
-			smiles.append(Osmi_dic[i]["Osmi"])
-		Align_DF["SMILES"] = smiles
-		Align_DF.to_csv(file_name + ".%d"%a + ".csv",index=False)
-	for i in glob.glob(file_name + "*.csv"):
-		df_list.append(pd.read_csv(i))
-		os.remove(i)
-	fin_df = pd.concat(df_list).sort_values(by="PCScore",ascending=False)
-	fin_df.to_csv(out_csv_path + file_name + ".BBAlign.total.csv",index=False) # Extract Backbone Align score file
-
-	smi_list = fin_df["SMILES"].drop_duplicates()
-	for smi in smi_list: 
-		idid = []
-		pcscore = np.float64(fin_df[fin_df["SMILES"] == smi]["PCScore"][:1])
-		dd = Fetch_BB_smis(smi,t_smiset,DB_Path)
-		if dd is None:
-			id_df = None
-			pass
-		else:
-			for t_smi in dd:
-				Fetch_BB_IDs(t_smi,idid,id_BB,DB_Path)
-			id_df = Final_Annot(idid,id_BB,pcscore,DB_Path)
-
-		df_list_t.append(id_df)
-		if id_df is None:
-			pass
-		else:
-			t_idset = t_idset | set(id_df["ZID"].tolist())
-		print(len(t_idset))
-		if len(t_idset) >= int(N_ZIDs_cutoff):
-			break
-		else:
-			pass
-	fin_df = pd.concat(df_list_t).drop_duplicates()
-	for i in t_idset:
-		drop_df = fin_df[fin_df["ZID"] == i].sort_values(by="PCScore",ascending=False)[:1]
-		df_list3.append(drop_df)
-	fin_df = pd.concat(df_list3).sort_values(by="PCScore",ascending=False)
-
-	za_df = AlignM3D(file_name,asmi,fin_df["ZID"],fin_df["SMILES"]).rename(columns={"Query":"ZID","PCScore":"Z_PCScore"}).drop(["Template"],axis=1)
-	fin_df = reduce(lambda x,y : pd.merge(x,y,on="ZID"),[fin_df,za_df]).rename(columns={"PCScore":"BB_PCScore"}).sort_values(by="Z_PCScore",ascending=False)
-	for i in fin_df["ZID"]:
-		tier_list.append("T 1.6 Backbone Alignment Search")
-	fin_df["Tier"] = tier_list
-	fin_df = pd.concat([wsmi_df,fin_df])
-	fin_df = fin_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
-	fin_df.reset_index(drop=True,inplace=True)
-	fin_df1 = fin_df[fin_df["BB_PCScore"] >= 0.70][fin_df["Z_PCScore"] >= 0.70] # BB PCScore Cutoff & Z PCScore Cutoff
-	pd.concat([wsmi_df,fin_df1]).to_csv(out_csv_path + file_name + ".fin_out.csv",index=False)
-	pd.concat([wsmi_df,fin_df]).to_csv(out_csv_path + file_name + ".all_out.csv",index=False)
-
-	return fin_df1
-def working_ZADC(asmi,file_name,afile,InputCP):
-	fin_df = pd.DataFrame()
-	ZIDs = []
-	aBB = Extract_BB(asmi)
-	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* " + file_name
-	re_list = working_a0(asmi,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-	re_list1 = working_a1(asmi,file_name,afile)
-	if re_list1 == -1: # Check inner-Scaffold
-		fin_df = working_a2(asmi,file_name,InputCP) # if mol don't have inner-Scaffold,it do Backbone Align
-		#return fin_df
-	else:
-		re_list = re_list|set(re_list1)
-	if not fin_df.empty:
-		zdf = pd.concat([wsmi_df,fin_df])
-	else:
-		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
-		if len(ZIDs) >= N_ZIDs_cutoff:
-			print(zdf)
-			pass
-		else:
-			fin_df = working_a2(asmi,file_name,InputCP)
-			tfin_df = pd.concat([wsmi_df,zdf,fin_df]).drop_duplicates().reset_index(drop=True)
-			zdf = tfin_df
-			print(zdf)
-	
-	zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
-	zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
-	print(zdf)
-	zdf.to_csv(out_csv_path + file_name + ".ZADC.csv",index=False)
-	return zdf
-
-def working_ZDC(asmi,file_name,afile,InputCP):
-	fin_df = pd.DataFrame()
-	ZIDs = []
-	aBB = Extract_BB(asmi)
-	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* " + file_name
-	global CF_dic,finl_dic
-	re_list = working_a0(asmi,file_name)
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-
-	re_list1 = working_a1(asmi,file_name,afile)
-	if re_list1 == -1:
-		fin_df = working_a2(asmi,file_name,InputCP)
-	else:
-		re_list = re_list|set(re_list1)
-	print(fin_df)
-	if not fin_df.empty:
-		zdf = pd.concat([wsmi_df,fin_df])
-	else:
-		ZIDs,zdf = BB_Align_Class_Search_ForZADC(Extract_BB(asmi),file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
-		if len(ZIDs) >= N_ZIDs_cutoff:
-			print(zdf)
-			pass
-		else:
-			fin_df = working_a2(asmi,file_name,InputCP)
-			tfin_df = pd.concat([wsmi_df,zdf,fin_df]).drop_duplicates().reset_index(drop=True)
-			zdf = tfin_df
-			print(zdf)
-
-	zdf = zdf[["ZID","Z_PCScore","BB_PCScore","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","SMILES","Purchasability","Tier"]]
-	zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
-	print(zdf)
-	zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
-	pre_bb,pre_id = Scaffolds_for_Clustering(zdf,file_name)
-	Active_Clustering(file_name,pre_bb,pre_id)
-	
-	return zdf
-def working_ZDC2(asmi,file_name,afile,InputCP):
-	fin_df = pd.DataFrame()
-	ZIDs = []
-	aBB = Extract_BB(asmi)
-
-	wsmi_df = pd.DataFrame().from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* "+file_name
-
-	re_list = working_a0(asmi,file_name)
-
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list = set(re_list)
-
-	re_list1 = working_a1(asmi,file_name,afile)
-	if re_list1 == -1:
-		return pd.DataFrame()
-	else:
-		re_list = re_list|set(re_list1)
-
-	#ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff)
-	ZIDs,zdf = BB_Align_Class_Search_ForZADC(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
-	if zdf.empty:
-		print("No Result")
-		return pd.DataFrame()
-	else:
-
-		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier"]]
-		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
-		print(zdf)
-		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
-
-		return zdf
-def working_a4(asmi,file_name,afile,InputCP):
-	fin_df = pd.DataFrame()
-	ZIDs = []
-	aBB = Extract_BB(asmi)
-	wsmi_df = pd.DataFrame.from_dict(InputCP,orient="index").T
-	wsmi_df["ZID"] = "* " + file_name
-
-	re_list = working_a0(asmi,file_name)
-
-	if re_list == -1:
-		re_list = set()
-	else:
-		re_list=set(re_list)
-
-	re_list1 = working_a1_deep(asmi,file_name,afile)
-	if re_list1 == -1:
-		return pd.DataFrame()
-	else:
-		re_list = re_list|set(re_list1)
-	ZIDs,zdf = BB_Align_Class_Search(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
-	if zdf.empty:
-		print("No Result")
-		return pd.DataFrame()
-	else:
-		zdf = zdf[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Tier"]]
-		zdf = pd.concat([zdf[:1],zdf[1:].sort_values(by="Z_PCScore",ascending=False)])
-		print(zdf)
-		zdf.to_csv(out_csv_path + file_name + ".ZDC.csv",index=False)
-		return zdf
-
-def Search_About_2DBs(asmi,file_name,afile,InputCP):
-    total_df = working_ZDC2(asmi,file_name,afile,InputCP)
-    if total_df.empty or len(total_df) <=500:
-        temp_df = working_a4(asmi,file_name,afile,InputCP)
-        temp_df["Purchasability"] = "Unknown"
-    else:
-        total_df["Search On"] = "Purchasable DB"
-        return total_df
-    #total_df["Search On"] = "Purchasable DB"
-    #temp_df["Search On"] = "All DB"
-    if temp_df.empty and total_df.empty:
-        return pd.DataFrame()
-    elif temp_df.empty :
-        re_df = total_df
-        re_df["Search On"] = "Purchasable DB"
-    else:
-        total_df["Search On"] = "Purchasable DB"
-        temp_df["Search On"] = "All DB"
-        re_df = pd.concat([total_df,temp_df[1:]])
-    re_df = re_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier","Search On"]]
-    re_df1 = pd.concat([re_df[:1],re_df[1:].sort_values(by="Z_PCScore",ascending=False)])
-    re_df1.to_csv(out_csv_path + "%s.2DBs.csv"%file_name,index=False,sep='\t')
-
-    return re_df
-"""
-def Extract_ADC():
-
-    global T1_pcscore_cutoff,N_ZIDs_cutoff
-    T1_pcscore_cutoff=0.98
-    ring_cutoff=1
-    N_ZIDs_cutoff = 1500
-
-    iPath='./Data/Input/'
-    global oPath
-    oPath='./Data/ADC_Output/Files/'
-    rei_img_Path='./Data/Re_Input/IMG/'
-
-    #DB_Path='./Data/DB_Tables/'
-    #DB_Path='../3D_Scan/Data/DB_Table/'
-    global DB_Path
-    #DB_Path='/ssd/swshin/1D_Scan.v2/Data/DB_Table/'
-    DB_Path = "/lwork01/yklee/DB_Table/"
-    BB_ID_dic = load_BBID()
-    #global BB_ID_dic
-
-    # MW of template
-    # 5*'C'(6)+1*'0'(8)
-    TR_MW = 38
+    tmp_list=[asmi,desc['MW'],desc['logP'],desc['HBA1'],desc['HBD'],desc['TPSA'],Num_Ring]
+    Re_dic={'SMILES':asmi}
+    Re_dic.update({'MW':desc['MW']}) 
+    Re_dic.update({'LogP':desc['logP']}) 
+    Re_dic.update({'HBA':desc['HBA1']}) 
+    Re_dic.update({'HBD':desc['HBD']}) 
+    Re_dic.update({'TPSA':desc['TPSA']}) 
+    Re_dic.update({'Ring':Num_Ring}) 
     
-    # Margin of MW
-    # 5*'C'(6)+1*'0'(8)
-    #M_MW = 0.1
-    #M_MW = 0.2
+    #return tmp_list 
+    return Re_dic 
 
-    # Remove the previous ADC output
-    shutil.rmtree(oPath)
-    os.mkdir(oPath)
 
-    shutil.rmtree(rei_img_Path)
-    os.mkdir(rei_img_Path)
-    #return
+def Extract_BB(asmi):
 
-    # Extract Backbone from input files
-    print 'Starting ZINC-ADC...'
-    split_BB_list(iPath,BB_ID_dic)
-    if_list=glob.glob(iPath+'*.smi')
-    #if_list = glob.glob(iPath + "STB_BB_1608376.smi")
-    if_list.sort()
+    # File input and output version!
+    # Check the sng.jar exists or not!
+    if Check_sng() ==-1:  
+        return 
 
-    # Check if there exists input files
-    if len(if_list)==0:
-        print 'There are no input(no smi files).....'
-        return
+    # File input and output version!
+    proc = os.getpid()
+    f_name=str(proc)+'.smi'
 
-    BB_list=[]
-    Main_list =[]
-    re =[]
-    sum_df = []
-    alp = 0
-    #OK_flag=0
-    # For one input
-    out_file = "./Data/ADC_Output/Out_Summary.csv"
-    out_file2 = "./Data/ADC_Output/Error_SMILES.csv"
+    fp_for_out=open(f_name,'w')
+    fp_for_out.write(asmi)
+    fp_for_out.close()
 
+    # excuate sng
+    FNULL = open(os.devnull, 'w')
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+
+    re_name=str(proc)+'.tmp'
+    fp_for_in=open(re_name,'r')
+    lines=fp_for_in.readlines()
+    fp_for_out.close()
+
+    #########################################
+    # Extract Backbone
+    scaffold_backbone=''
+    ln_lines=len(lines)
+
+    #####################################################################
+    # If there is no scaffolds, The Original structure is used as backbone.
+    if ln_lines==1:
+        scaffold_backbone = asmi
+    #####################################################################
+
+    if ln_lines>1:
+        last_line=lines[ln_lines-1]
+        if ln_lines>2:
+            token=last_line.split(',')
+            scaffold_backbone = token[-2].strip()
+        if ln_lines==2:
+            token=last_line.split()
+            scaffold_backbone = token[-1][:-1].strip()
+
+    scaffold_backbone = processing_backbone(scaffold_backbone)
+    os.unlink(f_name)
+    os.unlink(re_name)
     
-    # ############################################################################
-    for afile in if_list:
-        alp += 1
-        M_MW = 0.075
-        print(bcolors.WARNING + "Processing : %s - %d/%d \n"%(afile,alp,len(if_list)) + bcolors.ENDC)
-        atmp_list =[]
-        asmi = Read_SMILES_FILE(afile)
-        Input_CP = Extract_CP(asmi)
-        Input_Num_Ring = Input_CP["Ring"]
-        OK_flag=0
-
-        aBB = Extract_BB(asmi)
-        if aBB in BB_list:
-            continue
-        BB_list.append(aBB)
-        fn = os.path.basename(afile)
-        file_name = os.path.splitext(fn)[0]
-
-        Draw_BB_smi(rei_img_Path,fn,aBB)
-        ZIDs = T1_Class_Search(aBB,file_name,m_type=1)
-        tmp_list = []
-        id_smi = {}
-        re_list = set()
-        if ZIDs == -1:
-            idx =1
-        else:
-            for zids in ZIDs:
-                tmp_df = Fetch_Purch_Annot(zids,DB_Path)
-                if tmp_df is None:
-                    pass
-                elif ''.join(tmp_df["Purchasability"].tolist()) == "Unknown":
-                    pass
-                else:
-                    tmp_list.append(tmp_df)
-        if not tmp_list:
-            idx = 1
-            print(bcolors.WARNING + "Go To T 1.5" + bcolors.ENDC)
-        else:
-            tmp_df = pd.concat(tmp_list)
-            idx = 0
-            for i in tmp_df["ZID"]:
-                Fetch_SMILES_by_ID(i,id_smi,DB_Path)
-            for i in list(set(id_smi.values())):
-                re_list.add(Extract_BB(i))
-            re_list = list(re_list)
-            print(bcolors.WARNING + "T 1.5 Pass" + bcolors.ENDC)
-                
-        #
-        if idx == 1 :
-            print(bcolors.WARNING + "\nTier 1.5 Start\n" + bcolors.ENDC)
-            Total_re_list =set()
-            re_list = []
-            while(OK_flag!=1):
-                print(bcolors.WARNING + 'Loop: %d'%idx + bcolors.ENDC)
-                #re,tmp_mw = T15_Class_Search(afile,TR_MW,M_MW,Total_re_list)
-                re,tmp_mw = T15_Class_Search_Type2(afile,TR_MW,M_MW,Total_re_list)
-                if re == -1 or tmp_mw == -1 : # No Scaffold and inter-ring
-                    break
-                M_MW = M_MW+0.05
-                re = set(list(re))
-                Total_re_list = Total_re_list|re
-                ltrl = len(Total_re_list)
-                print len(Total_re_list),type(Total_re_list) 
-                idx+=1
-                if ltrl == 0 and idx==3: # Number of backbones is 0 and Number of loop is 4
-                    break
-                if len(list(Total_re_list))>=1 or tmp_mw >= np.float64(700.0) or idx == 3:
-                    OK_flag=1
-                    if len(list(Total_re_list)) >= 1:
-                        re_list = Total_re_list #random.sample(list(Total_re_list),20)
-                    else:
-                        re_list = Total_re_list
-            os.system("clear")
-            print(bcolors.WARNING + "T 1.5 Process End : %s - %d/%d \n"%(afile,alp,len(if_list)) + bcolors.ENDC)
-                
-        if not re_list:
-            ttmp_df = pd.DataFrame()
-            pass
-        else:
-            print(bcolors.WARNING + '\nnTotal Num. of candidate ligand for '+afile+': '+str(len(re_list)) + bcolors.ENDC)
-            #ZIDs,zdf = BB_Align_Class_Search(aBB,file_name,re_list,ZIDs,N_ZIDs_cutoff) # from MD_BA_class2
-			#	print(len(t_idset))
-            ZIDs,zdf = BB_Purch_Search(aBB,file_name,re_list)
-            ttmp_df = zdf
-            #if zdf.empty:
-            #    ttmp_df = pd.DataFrame()
-            #else:
-            #    ttmp_df = Write_Out_Summary(file_name,aBB,zdf) # from MD_BA_class2
-        #sum_df.append(ttmp_df)
-        if ttmp_df.empty:
-            with open(out_file2,"a") as W:
-                W.write(asmi + '\n')
-        if not os.path.exists(out_file):
-            ttmp_df.to_csv(out_file,index=False,mode="w")
-        else:
-            ttmp_df.to_csv(out_file,index=False,mode="a",header=False)
-        #sum_df.append(ttmp_df)
-
-    # Write summary
-    #out_file='./Data/ADC_Output/Out_Summary.csv'
-    #sum_df1 = pd.concat(sum_df)
-    #print(sum_df1)
-    #sum_df1.to_csv(out_file,index=False)
-
-    return
-"""
+    return scaffold_backbone
 
 
-def T1_Class_Search(aBB,file_name,m_type):
-    re = Search_ASMILES(aBB,m_type)
-    if re == -1:
-        return re
-    zids=list(re)
-    #list_SDFs = FetchM_SDF(zids,DB_Path)
-    #Save_Extracted_SDF(list_SDFs,file_name,oPath)
+def processing_backbone(scaffold_backbone):
 
-    return zids
+    type1 = '[*]'
+    type2 = '([*])'
 
-def BB_Align_Class_Search(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP): # from MD_BA_class2
-    didi = {} # Manager().dict()
-    smis = []
-    zids = set(ZIDs)
-    in_ID = file_name
-    asmi = aBB
-    for i,j in zip(re_list,range(len(re_list))):
-        didi[str(j)] = i
+    old_backbone=scaffold_backbone
+    scaffold_backbone = scaffold_backbone.replace(type2,'')
+    scaffold_backbone = scaffold_backbone.replace(type1,'')
+    #print 'Before: '+old_backbone+' ---> After: '+scaffold_backbone
 
-    Align_DF = AlignM3D(in_ID,asmi,didi.keys(),didi.values())
-    for i in Align_DF["Query"]:
-        smis.append(didi[i])
-    Align_DF["SMILES"] = smis
-    Align_DF.to_csv("./Data/ADC_Output/" + in_ID + '.total.csv',index=False)
+    return scaffold_backbone
 
-    mol2_list = glob.glob("*.mol2")
-    Ncpu = multiprocessing.cpu_count()
-    pool = multiprocessing.Pool(Ncpu-2)
-    pool.map(multi_file_remove_func,mol2_list)
+
+def Check_sng():
+    if not os.path.exists('./sng.jar'):
+        print 'This python program needs \'sng.jar\'.'
+        print 'Move the \'sng.jar\' program at this fold and re excute this program.'
+        return -1
+    else:
+        return 1
+
+
+#def ExtractM_BB(flist:list,slist:list):
+def ExtractM_BB(iPath):
+    
+    time1=time()
+
+    if Check_sng() ==-1:  
+        return 
+
+    flist=glob.glob(iPath+'*.smi')
+    slist=[]
+    for afile in flist:
+        fp_for_in = open(afile,'r')
+        line=fp_for_in.readline().strip()
+        token=line.split()
+        #print token[0]
+        slist.append(token[0])
+
+    nslist=zip(slist,flist)
+    nslist = list(nslist)
+    ln_nslist=len(nslist)
+
+    print 'Starting making backbone........'
+    # Mulitprocessing
+    manager = Manager()
+    Re_dic = manager.dict()
+    Main_list = manager.list()
+    tmp_list = manager.list()
+
+    Num_Of_CPU=multiprocessing.cpu_count()
+    #Num_Of_CPU=2
+    pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
+    func=partial(Make_BB_Core,ln_nslist,nslist,Main_list,tmp_list)
+    pool.map(func,nslist)
     pool.close()
     pool.join()
 
-    #zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
-    #zzids,ddf = Make_result_deep(file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
-    zzids,ddf = Make_result(4,asmi,file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
-    if zzids is None:
-        return pd.DataFrame()
-    else:
-        zzids = list(zzids)
+    Main_list=list(Main_list)
+    df = pd.DataFrame.from_records(Main_list,columns=['Backbone','Original','File'])
+    #print df.head()
+    print '\n --> Ending making backbone........'
+    #print df.head()
 
-        return zzids,ddf
-def BB_Align_Class_Search_ForZADC(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP):
-	didi = {}
-	smis = []
-	zids = set(ZIDs)
-	in_ID = file_name
-	asmi = aBB
-	for i,j in zip(re_list,range(len(re_list))):
-		didi[str(j)] = i
-	Align_DF = AlignM3D(in_ID,asmi,didi.keys(),didi.values())
-	for i in Align_DF["Query"]:
-		smis.append(didi[i])
-	Align_DF["SMILES"] = smis
-	Align_DF2 = Align_DF #[Align_DF["PCScore"] >= 0.8] # Backbone PCScore Cutoff
-	
-	Align_DF2.to_csv("./Data/ADC_Output/" + in_ID + ".total.csv",index=False)
-	#zzids,ddf = Make_BB_Align_result2(file_name,zids,N_ZIDs_cutoff,asmi,DB_Path)
-	#zzids,ddf = Make_result_deep(file_name)
-	zzids,ddf = Make_result(1,asmi,file_name,zids,N_ZIDs_cutoff,aBB,InputCP,DB_Path)
-	if zzids is None:
-		return
-	else:
-		zzids = list(zzids)
-		return zzids,ddf
+    time2=time()
+    print 'Extracting input chmeical feature time: '+str('{:.2f}'.format(time2-time1))+' sec.'
 
-def Active_Clustering(fn,bb_list,id_list):
-	df = pd.DataFrame()
-	temp_list = []
-	temp_list2 = []
-	temp_list3 = []
-	temp_list4 = []
-	df["Backbone"] = bb_list
-	df["ZID"] = id_list
-
-	global temp_list
-
-	temp_list = Manager().list()
-	CF_dic = {}
-	finl_dic = {}
-
-	for i in bb_list:
-		try:
-			rm = Chem.MolFromSmiles(i)
-		except:
-			pass
-		if not rm is None:
-			try:
-				fw = MurckoScaffold.MakeScaffoldGeneric(rm)
-			except:
-				pass
-			if not fw is None:
-				CF_dic[i] = Chem.MolToSmiles(fw)
-			else:
-				pass
-		else:
-			pass
-	remain_smiles = set(CF_dic.keys())
-	Scaffold_Clustering(CF_dic,finl_dic,remain_smiles)
-
-	for i in finl_dic:
-		finl_dic[i] = ','.join(finl_dic[i])
-	pdf = pd.DataFrame.from_dict(finl_dic,orient="index").reset_index().rename(columns={"index":"Backbone",0:"Cluster_Members"})
-	ddf = pd.merge(df,pdf,on="Backbone")
-
-	for idx,line in ddf.iterrows():
-		tnum = 0
-		for i in line["Cluster_Members"].split(","):
-			aa = df[df["Backbone"]==i]["ZID"].values[0].split(",")
-			print(type(aa))
-			print(aa)
-			tsum = len(aa)
-			tnum += tsum
-			for j in aa: #df[df["Backbone"]==i]["ZID"].values[0]): #.split(","):
-				temp_list3.append(j)
-		temp_list.append(tnum)
-		rm = Chem.MolFromSmiles(line["Backbone"])
-		sssr = Chem.GetSSSR(rm)
-		temp_list2.append(sssr)
-		temp_list4.append(",".join(temp_list3))
-	ddf.drop("ZID",axis=1,inplace=True)
-	ddf["Total of ZIDs"] = temp_list
-	ddf["Num of Rings"] = temp_list2
-	ddf["ZID"] = temp_list4
-	ddf = ddf[["Backbone","Num of Rings","Total of ZIDs","Cluster_Members","ZID"]]
-	ddf.sort_values(by="Total of ZIDs",ascending=False,inplace=True)
-	ddf.to_csv(out_csv_path + "%s.Cluster.csv"%fn,index=False)
-	
-def BB_Purch_Search(aBB,file_name,re_list):
-	######################################
-	# Bio Active Backbone Analysis Tools #
-	######################################
-	id_BB = {}
-	for bb in re_list:
-		idid = []
-		Fetch_BB_IDs(bb,idid,id_BB,DB_Path)
-		for ids in idid:
-			t_list = []
-			t_df = pd.DataFrame()
-			t_id = ids
-			purch_df = Fetch_Purch_Annot(ids,DB_Path)
-			if purch_df is None:
-				pass
-			elif ''.join(purch_df["Purchasability"].tolist()) == "Unknown":
-				pass
-			else:
-				t_list.append(t_id)
-				cp_df = Fetch_CP_Annot(t_id,DB_Path)
-				t_df = pd.merge(cp_df,purch_df)
-				t_df["File_Name"] = [file_name]
-				t_df["Backbone"] = [aBB]
-				t_df = t_df[["File_Name","ZID","SMILES","Backbone","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","Purchasability"]]
-				return t_list,t_df
-	return t_list,t_df
-
-	
-	
-	
+    return df
 
 
 
+def Make_BB_Core(ln_slist,slist,Main_list,tmp_list,casmi):
 
-def T2_Class_Search(df_subscaffold):
+    aidx=slist.index(casmi)
+    #return
+    asmi=casmi[0]
+    asmi_path=casmi[1]
+    
+    print ' --> Processing....:'+str(aidx+1)+'/'+str(ln_slist)+' ,mol:'+asmi+'\r', 
+    sys.stdout.flush()
+
+    proc = os.getpid()
+    f_name=str(proc)+'.smi'
+
+    # write smiles
+    fp_for_out=open(f_name,'w')
+    fp_for_out.write(asmi)
+    fp_for_out.close()
+
+    # excuate sng
+    FNULL = open(os.devnull, 'w')
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+
+    re_name=str(proc)+'.tmp'
+    fp_for_in=open(re_name,'r')
+    lines=fp_for_in.readlines()
+    fp_for_out.close()
+
+    #########################################
+    # Extract Backbone
+    scaffold_backbone=''
+    ln_lines=len(lines)
+
+    #####################################################################
+    # If there is no scaffolds, The Original structure is used as backbone.
+    if ln_lines==1:
+        scaffold_backbone = asmi
+    #####################################################################
+
+    if ln_lines>1:
+        last_line=lines[ln_lines-1]
+        if ln_lines>2:
+            token=last_line.split(',')
+            scaffold_backbone = token[-2].strip()
+        if ln_lines==2:
+            token=last_line.split()
+            scaffold_backbone = token[-1][:-1].strip()
+
+    scaffold_backbone = processing_backbone(scaffold_backbone)
+    tmp_list=[scaffold_backbone,asmi,asmi_path]
+    Main_list.append(tmp_list)
+
+    os.unlink(f_name)
+    os.unlink(re_name)
     return
 
 
-def T3_Class_Search(df_subscaffold):
+def Draw_BB_smi(o_path,f_name,smi):
+
+    BB_f_name=f_name+'.png'
+    BB_img_path = os.path.join(o_path,BB_f_name)
+    #print BB_img_path
+    arg='obabel -:"'+smi+'" -O '+BB_img_path+' -xw 350 -xh 250 -d'
+    #print arg
+    #FNULL = open(os.devnull, 'w')
+    #subprocess.call(arg,stdout=FNULL, stderr=subprocess.STDOUT)
+    os.system(arg)
+
     return
 
 
-def T4_Class_Search(df_subscaffold):
-    return
+def Extract_SubScaffold(asmi):
+
+    if Check_SNG()==-1:
+        sys.exit(1)
+
+    # File input and output version!
+    proc = os.getpid()
+    f_name=str(proc)+'.smi'
+    fp_for_out=open(f_name,'w')
+    fp_for_out.write(asmi)
+    fp_for_out.close()
+
+    # excuate sng
+    FNULL = open(os.devnull, 'w')
+    subprocess.call(['%sjava'%java_path,'-jar','sng.jar','generate','-o', str(proc)+'.tmp',f_name], stdout=FNULL, stderr=subprocess.STDOUT)
+
+    re_name=str(proc)+'.tmp'
+    fp_for_in=open(re_name,'r')
+    head=fp_for_in.readline()
+    lines=fp_for_in.readlines()
+    fp_for_out.close()
+
+    #########################################
+    # Extract Backbone
+    scaffold_backbone=''
+    ln_lines=len(lines)
+
+    #####################################################################
+    # If there is no scaffolds, The Original structure is used as backbone.
+    if ln_lines==0:
+        scaffold_backbone = asmi
+    #####################################################################
+
+    Main_list=[]
+    for aline in lines:
+        tmp_list=[]
+        token=aline.split('\t')
+        tmp_list=[token[0],token[1]]
+        Main_list.append(tmp_list)
+
+    df = pd.DataFrame.from_records(Main_list,columns=['Ring_Num','smiles'])
+    df = df.sort_values(by=['Ring_Num'],ascending=True)
+
+    os.unlink(f_name)
+    os.unlink(re_name)
+    #print df
+
+    return df 
 
 
-def T5_Class_Search(df_subscaffold):
-   
-    for index,row in df_subscaffold.iterrows():
-        #print row[0],row[1]
-        # Ring Num check
-        if int(row[0]) > 1:
-            asmi=row[1]
-            print asmi
-            Search_ASMILES(asmi)
+def Extract_FusionR(asmi):
+
+    df = Extract_SubScaffold(asmi)
+    FR=[]
+    for index,row in df.iterrows():
+        Num_Ring=int(row[0])
+        if Num_Ring>1:
+            smi=row[1]
+            mol = Chem.MolFromSmiles(smi)
+            m_RB = Descriptors.NumRotatableBonds(mol)
+            if m_RB==0:
+                FR.append(smi)
+
+        '''
+        mol = Chem.MolFromSmiles(smi)
+        m_RingCount = Descriptors.RingCount(mol)
+        m_RB = Descriptors.NumRotatableBonds(mol)
+        m_SA = rdMolDescriptors.CalcNumSpiroAtoms(mol)
+        m_BHA= rdMolDescriptors.CalcNumBridgeheadAtoms(mol) 
+        print 'smiles:',smi,',RC:',m_RingCount,',RB:',m_RB,',SA:',m_SA,',BHA:',m_BHA
+        '''
+    #print FR, df
+    return FR, df
+
+
+def Swap_Ring(asmi):
+
+    # Handling both side rings
+    list_FR, scaffold_df = Extract_FusionR(asmi) 
+    BB = Extract_BB(asmi)
+    list_ring=[]
+    r1=''
+    r2=''
+    r_flag=0
+    idx_r1=0
+    for achar in BB:
+        r1=r1+achar
+        if achar.isdigit() and r_flag==0:
+            r_flag=achar
+            continue
+        if achar.isdigit() and r_flag!=0 and r_flag==achar:
             break
+        idx_r1+=1
+    print r1,idx_r1
 
-    return
-"""
-def T15_Class_Search(afile,TR_MW,M_MW,MW_Index_list):
+    r_BB=BB[::-1]
+    print len(BB),BB
+    print len(r_BB),r_BB
+    
+    r_flag=0
+    idx_r2=0
+    for achar in r_BB:
+        r2=r2+achar
+        if achar.isdigit() and r_flag==0:
+            r_flag=achar
+            continue
+        if achar.isdigit() and r_flag!=0 and r_flag==achar:
+            r2=r2+r_BB[idx_r2+2]
+            r2=r2[::-1]
+            break
+        idx_r2+=1    
+            
+    print r2,idx_r2
+        
+    
+    New_BB=r2+BB[idx_r1+2:len(BB)-(idx_r2+3)]+r1
+    print New_BB
 
+    '''
+    One_Ring=[]
+    # Extract One-Ring
+    for index,row in scaffold_df.iterrows():
+        Num_Ring=int(row[0])
+        if Num_Ring==1:
+            One_Ring.append(row[1])
 
-    Re_ID_List=[]
+    print One_Ring,list_FR
 
-    # Max_Num= 500
-    Max_Num= 500
+    tmp_list=[]
+    #Matching substructure
+    for aFR in list_FR:
+        print aFR
+        maFR = Chem.MolFromSmiles(aFR)
+        for aOR in One_Ring:
+            maOR = Chem.MolFromSmiles(aOR)
+            if maFR.HasSubstructMatch(maOR):
+                #print aOR,'Yes'
+                tmp_list.append(aOR)
 
-    # For one input
-    print '\n'+'For file:',afile
-    print 'Start processing T1.5....'
-    atmp_list=[]
-    asmi = Read_SMILES_FILE(afile)
-    asmi = Make_Canonical_SMI(asmi)
-    #print 'rdkit smi:',asmi
-    if asmi == -1:
-        return -1,-1
-    pmol = readstring('smi',asmi)
-    psmi = pmol.write(format='smi')
-    #print 'pybel smi:',psmi
-    pBB = Extract_BB(psmi)
-    #print 'PBB:',pBB
-    re_list = Extract_Inner_Scaffold(pBB)
-
-    #if len(re_list) == 0:
-    if re_list == -1 or not re_list:
-        print 'There is no \'Scaffold\' in the mol'
-        return -1,-1
-    t_mw = 0
-    manager = Manager()
-    Re_Zid_list = manager.list()
-    for alist in re_list:
-        Scaffold = alist[0]
-        BB = alist[1]
-        Num_Brench = alist[2]
-        try:
-            pmol = readstring('smi',BB)
-        except:
-            print '  -> pybel reading input error'
-            return -1,-1
-
-        list_ring=pmol.sssr
-        num_ring = len(list_ring)
-
-        cp = Extract_CP(Scaffold)
-
-        #entry=(cp['MW'],cp['LogP'],cp['HBA'],cp['HBD'],cp['TPSA'],cp['Ring'])
-        #print entry
-        #Same_CPs = Fetch_BB_CP(entry,DB_Path)
-
-        print '\nScaffold: '+Scaffold+',Num. Brench: '+str(Num_Brench)
-        Total_Ring = num_ring + Num_Brench
-        print '  --> Querying samiles to CP DB'
-
-        S_MW = cp['MW']
-        IMW = (TR_MW*Num_Brench) + S_MW
-        print(IMW)
-        if M_MW == 0.1:
-            MMW = IMW * M_MW
-            FIMW_Max = IMW + MMW
-            FIMW_Min = IMW - MMW
-
-            #print FIMW_Min, FIMW_Max
-
-            entry=(FIMW_Min, FIMW_Max, Total_Ring)
-            t_mw = FIMW_Max
-            print entry
-            retri_list = Fetch_BB_BY_MW_RingNum(entry,DB_Path)
-            #print retri_list
-            #sys.exit(1)
-
-        else:
-            tM_MW =M_MW-0.05
-            MMW = IMW * tM_MW
-            PFIMW_Max = IMW + MMW
-            PFIMW_Min = IMW - MMW
-
-            MMW = IMW * M_MW
-            CFIMW_Max = IMW + MMW
-            CFIMW_Min = IMW - MMW
-
-            #print PFIMW_Min, PFIMW_Max, CFIMW_Min, CFIMW_Max
-
-            entry=(CFIMW_Min, PFIMW_Min, PFIMW_Max, CFIMW_Max,Total_Ring)
-            t_mw = CFIMW_Max
-            print entry
-            retri_list = Fetch_BB_BY_MW_RingNum(entry,DB_Path)
-
-        #return
-        if type(retri_list) == int:
-            pass
-        else:
-            print '  --> The number of retrieval: '+str(len(retri_list))
-
-        if retri_list == -1:
-            print '  --> There is no result of query and pass'
-            return -1,-1
+    print tmp_list
+    Side_One_Ring = [x for x in One_Ring if x not in tmp_list]
+    print One_Ring
+    print Side_One_Ring
+    print BB
+    '''
+    return New_BB
 
 
-
-        # Multi Version
-        #manager = Manager()
-        #Re_Zid_list = manager.list()
-        Num_Of_CPU=multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
-        func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-        #pool.map(func,tmp_retri_list)
-        pool.map(func,retri_list)
-        pool.close()
-        pool.join()
-
-
-    print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
-    return Re_Zid_list,t_mw
-"""
-#def T15_Class_Search_Type2(afile,TR_MW,M_MW,MW_Index_list):
-def T15_Class_Search_old(afile,TR_MW,M_MW,MW_Index_list):
-
-
-    Re_ID_List=[]
-
-    # Max_Num= 500
-    Max_Num= 500
-
-    # For one input
-    print '\n'+'For file:',afile
-    print 'Start processing T1.5....'
-    atmp_list=[]
-    asmi = Read_SMILES_FILE(afile)
-    asmi = Make_Canonical_SMI(asmi)
-    if asmi == -1 :
-        print("\nIt is Impossible to change Canonical SMILES\n")
-        return -1,-1
-    #print 'rdkit smi:',asmi
-    try:
-        pmol = readstring('smi',asmi)
-        psmi = pmol.write(format='smi')
-    except:
-        print("Error SMILES change : %s"%asmi)
-        return -1,-1
-    #print 'pybel smi:',psmi
-    pBB = Extract_BB(psmi)
-    #print 'PBB:',pBB
-    re_list = Extract_Inner_Scaffold(pBB)
-
-    #if len(re_list) == 0:
-    if re_list == -1 or not re_list:
-        print 'There is no \'Scaffold\' in the mol'
-        return -1,-1
-    t_mw = 0
-    manager = Manager()
-    Re_Zid_list = manager.list()
-    for alist in re_list:
-        Scaffold = alist[0]
-        BB = alist[1]
-        Num_Brench = alist[2]
-        try:
-            pmol = readstring('smi',BB)
-        except:
-            print '  -> pybel reading input error'
-            return -1,-1
-
-        list_ring=pmol.sssr
-        num_ring = len(list_ring)
-
-        cp = Extract_CP(Scaffold)
-
-        #entry=(cp['MW'],cp['LogP'],cp['HBA'],cp['HBD'],cp['TPSA'],cp['Ring'])
-        #print entry
-        #Same_CPs = Fetch_BB_CP(entry,DB_Path)
-
-        print '\nScaffold: '+Scaffold+',Num. Brench: '+str(Num_Brench)
-        Total_Ring = num_ring + Num_Brench
-        print '  --> Querying samiles to CP DB'
-
-        S_MW = cp['MW']
-        IMW = (TR_MW*Num_Brench) + S_MW
-        print(IMW)
-        if M_MW == 0.075:
-            MMW = IMW * M_MW
-            FIMW_Max = IMW + MMW
-            FIMW_Min = IMW - MMW
-
-            #print FIMW_Min, FIMW_Max
-
-            entry=(FIMW_Min, FIMW_Max, Total_Ring)
-            t_mw = FIMW_Max
-            print entry
-            retri_list = Fetch_BB_BY_MW_RingNum(entry,DB_Path)
-            #print retri_list
-            #sys.exit(1)
-
-        else:
-            tM_MW =M_MW-0.05
-            MMW = IMW * tM_MW
-            PFIMW_Max = IMW + MMW
-            PFIMW_Min = IMW - MMW
-
-            MMW = IMW * M_MW
-            CFIMW_Max = IMW + MMW
-            CFIMW_Min = IMW - MMW
-
-            #print PFIMW_Min, PFIMW_Max, CFIMW_Min, CFIMW_Max
-
-            entry=(CFIMW_Min, PFIMW_Min, PFIMW_Max, CFIMW_Max,Total_Ring)
-            t_mw = CFIMW_Max
-            print entry
-            retri_list = Fetch_BB_BY_MW_RingNum(entry,DB_Path)
-
-        #return
-        if type(retri_list) == int:
-            pass
-        else:
-            print '  --> The number of retrieval: '+str(len(retri_list))
-
-        if retri_list == -1:
-            print '  --> There is no result of query and pass'
-            return -1,-1
-
-
-        #print retri_list
-        #sys.exit(1)
-
-        # Multi Version
-        #manager = Manager()
-        #Re_Zid_list = manager.list()
-        Num_Of_CPU=multiprocessing.cpu_count()
-        pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
-        func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-        #pool.map(func,tmp_retri_list)
-        pool.map(func,retri_list)
-        #pool.map(func,retri_list[0:1000])
-        pool.close()
-        pool.join()
-
-        '''
-        # Serial Version
-        for relist in retri_list:
-            #print relist,Scaffold
-            #print relist[0],relist[1]
-
-            try:
-                tasmi = Make_Canonical_SMI(relist[1])
-            except:
-                continue
-            tm_mol = Chem.MolFromSmiles(tasmi)
-
-            try:
-                patt = Chem.MolFromSmiles(Scaffold)
-            except:
-                continue
-
-            match_list = tm_mol.GetSubstructMatches(patt)
-            if len(match_list)>0:
-                print 'Matched ID:',relist[0],relist[1],'                                                     \r',
-                sys.stdout.flush()
-                Re_ID_List.append(relist[0])
-        '''
-
-    print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
-    Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
-    return Re_Zid_list,t_mw
-
-def T15_query_parameters(ainput,TR_MW,mw_percent):
-	try:
-		Scaffold = ainput[0]
-	except:
-		return -1,-1
-	try:
-		BB = ainput[1]
-	except:
-		return -1,-1
-	try:
-		Num_Brench = ainput[2]
-	except:
-		return -1,-1
-	InputCP = Extract_CP(Scaffold)
-	########################
-	# Scaffold Information #
-	#######################
-	"""
-	print("Num of Brench",Num_Brench)
-	print("Backbone",BB)
-	print("Scaffold",Scaffold)
-	print("Chemical Properties",InputCP)"""
-	# Count Total Ring
-	try :
-		pmol = readstring("smi",BB)
-	except:
-		print("Pybel Reading Error")
-	list_ring = pmol.sssr
-	num_ring = len(list_ring)
-	
-	Total_Ring = num_ring + Num_Brench
-	# Calculate MW
-	S_MW = InputCP["MW"]
-	IMW = (TR_MW*Num_Brench) + S_MW
-	per_MW = IMW*np.float64(mw_percent)/np.float64(100)
-	nper_MW = IMW*np.float64(mw_percent-5.0)/np.float64(100)
-	if mw_percent == 7.5:
-		up_MW = IMW + per_MW
-		low_MW = IMW - per_MW
-
-		return IMW,(low_MW,up_MW,Total_Ring)
-	else:
-		uu_MW = IMW + per_MW
-		ul_MW = IMW + nper_MW #per_MW/2.0
-		
-		lu_MW = IMW - nper_MW #per_MW/2.0
-		ll_MW = IMW - per_MW
-		return IMW,(ll_MW,lu_MW,ul_MW,uu_MW,Total_Ring)
-
-	
-def T15_Class_Search_yklee(afile,TR_MW,M_MW):
-	Re_ID_List = []
-	atmp_list = []
-
-	Max_Num = 500
-
-	print("\nFor file : %s"%afile)
-	print("Start Processing T1.5....")
-	
-	asmi = Read_SMILES_FILE(afile)
-	asmi = Make_Canonical_SMI(asmi)
-	if asmi == -1: # pass point 1
-		print("\nIt is Impossible to change Canonical SMILES\n")
-		return -1
-	try: # pass point 2
-		pmol = readstring("smi",asmi)
-		psmi = pmol.write("smi")
-	except:
-		print("\nIt is Impossible to change SMILES\n")
-		return -1
-	pBB = Extract_BB(psmi)
-	
-	#InSCF_list = Extract_Inner_Scaffold(pBB)
-	#InSCF_list = Extract_Inner_Scaffold_3(pBB)
-	#print(InSCF_list)
-	if Check_Ring_Total_Ring_Num(pBB) <=2:
-		InSCF_list = Less_Than_Two_Ring(pBB)
-	else:
-		#InSCF_list = Extract_Inner_Scaffold_3(pBB)
-		#InSCF_list = Extract_Inner_Scaffold_4(pBB)
-		#InSCF_list = Extract_Inner_Scaffold_5(pBB)
-		InSCF_list = Extract_Inner_Scaffold_6(pBB)
-	print(InSCF_list)
-	if InSCF_list == -1 or not InSCF_list: # pass point 3
-		print("There is no \"Scaffold\" in the Mol")
-		return -1
-	t_mw = 0
-	manager = Manager()
-	Re_Zid_list = manager.list()
-	n_bbs = 0
-	for alist in InSCF_list:
-		Scaffold = alist[0]
-		break_flag = 0
-		mw_percent = 7.5
-		while break_flag == 0:
-
-			IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
-			if IMW == -1:
-				return -1
-			else:
-				pass
-			
-			#break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
-			retri_list = Fetch_PBB_BY_MW_RingNum(entities,DB_Path)
-			if type(retri_list) == int:
-				pass
-			else:
-				print '  --> The number of retrieval: '+str(len(retri_list))
-
-			if retri_list == -1:
-				print '  --> There is no result of query and pass'
-				return -1
-
-			Num_Of_CPU=multiprocessing.cpu_count()
-			pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
-			func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-			try:
-				pool.map(func,retri_list)
-			except:
-				return -1
-			pool.close()
-			pool.join()
-			print(len(Re_Zid_list))
-			if len(Re_Zid_list) >= 100 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
-				break_flag = 1
-			else:
-				break_flag = 0
-				mw_percent += 5.0
-
-	print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
-	Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
-	return Re_Zid_list
-
-def T15_Class_Search(afile,TR_MW,M_MW):
-    Re_ID_List = []
-    atmp_list = []
-
-    Max_Num = 500
-
-    print("\nFor file : %s"%afile)
-    print("Start Processing T1.5....")
-
-    asmi = Read_SMILES_FILE(afile)
-    asmi = Make_Canonical_SMI(asmi)
-    if asmi == -1: # pass point 1
-        print("\nIt is Impossible to change Canonical SMILES\n")
+def Check_SNG():
+    if not os.path.exists('./sng.jar'):
+        print ' This python program needs \'sng.jar\'.'
+        print ' Move the \'sng.jar\' program at this fold and re excute this program.'
         return -1
-    try: # pass point 2
-        pmol = readstring("smi",asmi)
-        psmi = pmol.write("smi")
-    except:
-        print("\nIt is Impossible to change SMILES\n")
-        return -1
-    pBB = Extract_BB(psmi)
-
-    #InSCF_list = Extract_Inner_Scaffold(pBB)
-    #InSCF_list = Extract_Inner_Scaffold_3(pBB)
-    #print(InSCF_list)
-    if Check_Ring_Total_Ring_Num(pBB) <=2:
-        InSCF_list = Less_Than_Two_Ring(pBB)
     else:
-        #InSCF_list = Extract_Inner_Scaffold_3(pBB)
-		#InSCF_list = Extract_Inner_Scaffold_4(pBB)
-                #inSCF_list = Extract_Inner_Scaffold_5(pBB)
-                InSCF_list = Extract_Inner_Scaffold_6(pBB)
-    print(InSCF_list)
-    if InSCF_list == -1 or not InSCF_list: # pass point 3
-        print("There is no \"Scaffold\" in the Mol")
-        return -1
-    t_mw = 0
-    manager = Manager()
-    Re_Zid_list = manager.list()
-    n_bbs = 0
-    for alist in InSCF_list:
-        Scaffold = alist[0]
-        break_flag = 0
-        mw_percent = 7.5
-        while break_flag == 0:
-
-            IMW,entities = T15_query_parameters(alist,TR_MW,mw_percent)
-            if IMW == -1:
-                return -1
-            else:
-                pass
-
-            #break_flag,n_bbs,retri_list = Fetch_BB_BY_MW_RingNum_temp(entities,mw_percent,n_bbs,DB_Path)
-            retri_list = Fetch_BB_BY_MW_RingNum(entities,DB_Path)
-            if type(retri_list) == int:
-                pass
-            else:
-                print '  --> The number of retrieval: '+str(len(retri_list))
-
-            if retri_list == -1:
-                print '  --> There is no result of query and pass'
-                return -1
-
-            Num_Of_CPU=multiprocessing.cpu_count()
-            pool = multiprocessing.Pool(processes=(Num_Of_CPU-1))
-            func=partial(MatchM_Substructre,Re_Zid_list,Scaffold)
-            try:
-                pool.map(func,retri_list)
-            except:
-                return -1
-            pool.close()
-            pool.join()
-            print(len(Re_Zid_list))
-            if len(Re_Zid_list) >= 100 or np.float64(entities[-2]) >= 700.0 or mw_percent >= 50.0:
-                break_flag = 1
-            else:
-                break_flag = 0
-                mw_percent += 5.0
-
-    print '\n\nTotal Num. of candidate ligand for '+afile+': '+str(len(Re_Zid_list))
-    Re_Zid_list = Check_Re_Zid_list(IMW,Re_Zid_list)
-    return Re_Zid_list
+        return 1
 
 
-####################################
-# Extract Scaffold For Clustering  #
-####################################	
-def Scaffolds_for_Clustering(in_df,f_name):
-	#global Re_Dic
-	idx = 0
-	lines = []
-	for ii, row in in_df.iterrows():
-		if idx == 0:
-			pass
-		else:
-			t_ZID = row.ZID.encode("ascii","ignore")
-			t_SMILES = row.SMILES.encode("ascii","ignore")
-			tmp_str = t_ZID + "," + t_SMILES
-			lines.append(tmp_str)
-		idx +=1
-	Re_Dic = R_Decomp(lines)
+def Read_SMILES_FILE(f_path):
+    
+    fp_for_in=open(f_path,'r')
+    line=fp_for_in.readline()
+    fp_for_in.close()
 
-	for key in Re_Dic:
-		lst_zid = Re_Dic[key]
-		str_zid = ",".join(lst_zid)
-		Re_Dic[key] = str_zid
-	df = pd.DataFrame(list(Re_Dic.items()),columns=["Backbone","ZID"])
-	out_f = out_csv_path + f_name + ".ZID.csv"
-	df.to_csv(out_f,index=False)
-	return df["Backbone"].tolist(),df["ZID"].tolist()
+    token=line.split()
+    asmi=token[0]
 
-def R_Decomp(lines):
-	ln_lines = len(lines)
-
-	manager = Manager()
-	Re_Dic = manager.dict()
-	Main_list = manager.list()
-
-	Ncpu = multiprocessing.cpu_count()
-	pool = multiprocessing.Pool(Ncpu-2)
-	func = partial(R_Decomp_Core,lines,ln_lines,Main_list,Re_Dic)
-	pool.map(func,lines)
-	pool.close()
-	pool.join()
-
-	return dict(Re_Dic)
-def R_Decomp_Core(lines,ln_lines,Main_list,Re_Dic,aline):
-	idx = lines.index(aline)
-
-	token = aline.split(",")
-	zid = token[0]
-	z_smiles = token[1]
-	zBB = Extract_BB(z_smiles)
-
-	proc = os.getpid()
-
-	re_list = Extract_Inner_Scaffold(zBB)
-
-	if type(re_list) == int:
-		return
-	else:
-		pass
-
-	for are_list in re_list:
-		BB= are_list[1]
-		if BB not in Re_Dic:
-			tmp_list = [zid]
-			Re_Dic[BB] = tmp_list
-
-		else:
-			tmp_list = Re_Dic[BB]
-			tmp_list.append(zid)
-			tmp_list = list(set(tmp_list))
-			Re_Dic[BB] = list(tmp_list)
-#########################################
-def diff(first, second):
-    return [item for item in first if item not in second]
-
-
-
-def MatchM_Substructre(Re_Zid_list,Scaffold,relist):
-
-    #print Scaffold,relist 
-
-    aBB = relist[0]
-
-    if aBB in Re_Zid_list:
-        return -1
-
-    try:
-        tasmi = Make_Canonical_SMI(aBB)
-    except:
-        return -1
-    tm_mol = Chem.MolFromSmiles(tasmi)
-
-    try: 
-        patt = Chem.MolFromSmiles(Scaffold)
-    except:
-        return -1
-    try:
-        match_list = tm_mol.GetSubstructMatches(patt)
-    except:
-        return -1
-    if len(match_list)>0:
-        if Check_Same_Scaffold(Scaffold,aBB) != -1:
-            print 'Matched ID:',aBB,'                                                             \r',
-            sys.stdout.flush()
-            Re_Zid_list.append(aBB)
-        else:
-            pass
+    return asmi
+    
 
 
 def Search_ASMILES(asmi,m_type):
 
+    T1_pcscore_cutoff=0.98
     T_ZIDs=set()
 
     if m_type==1 or m_type==3: 
@@ -4092,58 +2904,34 @@ def Search_ASMILES(asmi,m_type):
 
         T_ZIDs_BB=set()
 
-        #re=Fetch_BB(asmi,DB_Path)
-        re = Fetch_PBB(asmi,DB_Path)
-        #print re
-        if re is None:
-            print("SMILES %s , There is no result for extract BB matching")
-            return -1
-        elif len(re)>0:
+        re=Fetch_BB(asmi,DB_Path)
+        if len(re)>0:
             candi =re[-1]
             candi = set(candi)
             T_ZIDs_BB=T_ZIDs_BB.union(candi)
         else:
             print 'SMILES: '+asmi+', There is no result for extact BB matching.'
-            return -1
                
         cp = Extract_CP(asmi)
-        #print cp
 
         entry=(cp['MW'],cp['LogP'],cp['HBA'],cp['HBD'],cp['TPSA'],cp['Ring'])
-        #Same_CPs = Fetch_BB_CP(entry,DB_Path)
-        Same_CPs = Fetch_PBB_CP(entry,DB_Path)
+        Same_CPs = Fetch_BB_CP(entry,DB_Path)
         print  ' --> Same_CPs num: ',len(Same_CPs)
 
         # Extract smiles for same CP
         list_smi=[x[0] for x in Same_CPs]
 
-        #print list_smi
-        #print len(list_smi)
-        #print len(set(list_smi))
-
         # Make id list for AlignM3D
         list_smi_id=[range(0,len(list_smi),1)]
         list_smi_id = list_smi_id[0]
         list_smi_id = [str(x) for x in list_smi_id]
-        #print asmi
-        #print list_smi
-        #print list_smi_id
-        #sys.exit(1)
-        #return
-        #print len(list_smi_id)
         df = AlignM3D('template',asmi,list_smi_id,list_smi)
         df = df.drop(df[df.PCScore<T1_pcscore_cutoff].index)
-        #print df
-        #print Same_CPs
         
         for index,row in df.iterrows():
-            #print row[1]
-            #sys.exit(1)
-            #print list_smi[int(row[1])],Same_CPs[int(row[1])][0]
             candi = Same_CPs[int(row[1])][-1]  
             candi = set(candi) 
             T_ZIDs_BB=T_ZIDs_BB.union(candi)
-        #print len(T_ZIDs_BB),T_ZIDs_BB
 
 
     if m_type==2 or m_type==3: 
@@ -4157,27 +2945,17 @@ def Search_ASMILES(asmi,m_type):
         if len(list_zids)==0:
             print ' --> There is no result for scaffold matching'
         else:
-            #list_zids = list_zids[0:50]
-            # list of ZID:['ZINC000845648520', 'ZINC000330252169', 'ZINC000418997081']
-            #print len(list_zids)
-
             re = FetchM_SDF_to_SMI(list_zids,DB_Path)
             list_smi = [x[0] for x in re]
             list_smi_id = [x[1] for x in re]
-            #print len(list_smi),list_smi
-            #print len(list_smi_id),list_smi_id
 
             df = AlignM3D('template',asmi,list_smi_id,list_smi)
             df = df.drop(df[df.PCScore<T1_pcscore_cutoff].index)
 
-            # Test_Test
-            #df = df.drop(df[df.PCScore<0.5].index)
             tmp_list=[]
             for index,row in df.iterrows():
                 tmp_list.append(row[1])
-            #print tmp_list
             T_ZIDs_SF = T_ZIDs_SF.union(set(tmp_list))
-            #print len(T_ZIDs_SF),T_ZIDs_SF
 
     if m_type==1:
         return T_ZIDs_BB 
@@ -4189,121 +2967,1935 @@ def Search_ASMILES(asmi,m_type):
         return T_ZIDs 
 
     return
-def Check_Re_Zid_list(IMW,Re_Zid_list):
 
-    Re_Zid_list=list(Re_Zid_list[0:20])
-    #Re_Zid_list=list(Re_Zid_list)
 
-    re_tmp_list =[]
-    #print Re_Zid_list
-    #sys.exit(1)
+def Extract_SSSR_Idx(asmi):
 
-    for aele in Re_Zid_list:
-        #print aele
-        #re = Check_IS_Purchasable(aele,DB_Path)
-        #print re
-        #if re ==-1:
-            #continue
-        tmp_list=[]
-        pmol = readstring('smi',aele)
-        desc = pmol.calcdesc(descnames=['MW'])
-        pMW = desc['MW']
-        diff = abs(IMW-pMW)
-        tmp_list.append(diff)
-        tmp_list.append(aele)
-        re_tmp_list.append(tmp_list)
-        #print tmp_list
+    amol = readstring('smi',asmi)
+    list_ring=amol.sssr
+    #num_ring = len(list_ring)
+    tmp_list=[]
 
-    re_tmp_list = sorted(re_tmp_list, key=itemgetter(0))
-    #print re_tmp_list
-    re = [x[1] for x in re_tmp_list]
-    #print re
-    #sys.exit(1)
+    #list_ring=amol.OBMol.FindLSSR()
+    print list_ring
 
-    return re
+    #list_ring_info=amol.OBMol.FindRingAtomsAndBonds()  
+    #print list_ring_info
+    
+
+    for aring in list_ring:
+        tmp_list.append(aring._path)
+        
+    return tmp_list
 
 
 
+def Leave_Ring_NoInterconnection(df):
 
-def Save_Extracted_SDF(list_SDFs,t_fn,oPath):
+    # Remove like this example: Ring --- O --- Ring
+    # Only leave the ring itself: Ring, RingRing
+    for index,row in df.iterrows():
+        #print row[0],row[1]
+        #amol = readstring('smi',row[1])
+        #mol = Chem.MolFromSmiles(row[1])
+        #m_RB = Descriptors.NumRotatableBonds(mol)
+
+        re = Have_leaf_Ring(row[1])
+        #print 're:',re
+        #print 
+        if re == -1:
+            df = df.drop(df[df.smiles==row[1]].index)
+        
+        continue
+
+    return df
+    '''
+    #print row[1]
+        #print m_RB
+
+        # Structure: Ring - Ring
+        if m_RB>0:
+            df = df.drop(df[df.smiles==row[1]].index)
+            print 'm_RB'
+            print 'OK'
+            continue
+
+        # By num. of ring
+        ssr = Chem.GetSymmSSSR(mol)
+
+        # In case of a ring
+        if len(ssr) == 1:
+            continue
+
+        if m_RB==0:
+            continue
+
+        # In case of more than two rings
+        set_idx=set()
+        for aring in ssr:
+            print set(aring)
+            set_idx = set_idx | set(aring)
+
+        for aring in ssr:
+            print set(aring)
+            set_idx = set_idx & set(aring)
+
+        #print set_idx
+        #return
+        if len(set_idx)==0:
+            df = df.drop(df[df.smiles==row[1]].index)
+            print 'set_idx'
+            print 'OK'
+            continue
+
+
+        for atom in amol:
+            if not atom.OBAtom.IsInRing():
+                # pass atom having doublebond to ring 
+                if atom.OBAtom.HasDoubleBond():
+                    continue
+                if atom.type !='H':
+                    df = df.drop(df[df.smiles==row[1]].index)
+                    print 'Not in ring OK'
+                    break
+
+    return df
+    '''
+
+
+def Have_leaf_Ring(asmi):
+
+    #mol = readstring('smi',asmi)
+    mol = Chem.MolFromSmiles(asmi)
+    #print 'In Have_leaf_Ring (mol): ',mol,asmi,type(mol)
+    dic_atom_neig_idx, dic_atom_neig_sym = Extract_Atom_Neighbors(mol)
+    ssr = Chem.GetSymmSSSR(mol)
+    #print dic_atom_neig_idx
+
+    # a ring in ssr is leaf ring and remove from the candidate
+
+    diff_set = set()
+    if len(ssr) == 1:
+        return 1
+    for aring in ssr:
+        set_idx=set(aring)
+        #print list(aring)
+        for num_atom in list(aring):
+            nei_idx = dic_atom_neig_idx[num_atom]
+            #print num_atom, set(nei_idx)
+            tmp_set = set()
+            if set(nei_idx) <= set_idx:
+                pass
+            else:
+                tmp_set=set(nei_idx) - set_idx   
+                #print 'tmp_set:',tmp_set
+                tmp_list = list(tmp_set)
+                while(0<len(tmp_list)):
+                    X = tmp_list.pop()
+                    #print num_atom,x
+                
+                    # Remove speical case
+                    xbond = mol.GetBondBetweenAtoms(num_atom,X).GetBondType()
+                    #print xbond,type(xbond)
+                    if xbond == Chem.rdchem.BondType.DOUBLE:
+                        #print 'doble'
+                        continue
+
+                    # X located at other ring clustrer?
+                    #print 'X:',X
+                    xnode = mol.GetAtomWithIdx(X).IsInRing()
+                    if xnode == True:
+                        cluster_set = set()
+                        cluster_set = cluster_set | set_idx
+                        for xaring in ssr:
+                            tmp_idx = set(xaring)
+                            i_idx =set()
+                            i_idx = cluster_set & tmp_idx 
+                            if len(i_idx) != 0:
+                                cluster_set = cluster_set | tmp_idx
+                        #print 'cluster set:',cluster_set
+                        if X not in cluster_set:
+                            return -1
+                    else:
+                        i_idx = set()
+                        for xaring in ssr:
+                            tmp_dix = set(xaring)
+                            i_idx = set(xaring) & set_idx
+                            if len(i_idx) ==0:
+                                return -1
+                        
+                diff_set = diff_set | tmp_set
+        #print 'len of diff_set:',len(diff_set)
+        #if len(diff_set) == 1 or len(diff_set) == 3 or len(diff_set) == 5:
+        if len(diff_set) == 1: 
+            return -1
+        diff_set.clear() 
+
+    #print 
+    return 1
+
+
+
+def Check_SubScaffold(df):
+
+    for index,row in df.iterrows():
+        #print row[1]
+        mol = Chem.MolFromSmiles(row[1])
+        if mol == None:
+            return -1
+    return 1
+
+
+
+def Extract_Inner_Scaffold(asmi):
+
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+
+    '''
+    re = asmi.find('i')
+    if re != -1:
+        print 'Having \'i\''
+        return -1
+    '''
+
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+    # Test_Code
+    #smiles_1b  = Chem.MolToSmiles(m).replace('-','~')
+    #pattern_1b = Chem.MolFromSmarts(smiles_1b)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+
+    #print dic_atom_neig_idx
+    #print
+    #print dic_atom_neig_sym
+    #print 
+    #print dic_atom_sym
+    #print
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
    
-    #print ' -> Writing the SDF files'
-    t_dir = os.path.join(oPath,t_fn)
-    #print t_dir 
+    #print 'Orginal DF'
+    #print df
+    #print
 
-    if not os.path.exists(t_dir):
-        os.makedirs(t_dir)
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                #print match_list
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+
+                else:
+                    # using LSAlign 
+                    #pc_score = Align3D('m',row[1],'patt',p_smi)
+                    #print pc_score
+                    m_set = set()
+                    tmol = readstring('smi',row[1])
+                    m_set = Extract_Atoms_Set(tmol)
+                    m_list = Extract_Atoms_List(tmol)
+                    q_set = set()
+                    qmol = readstring('smi',p_smi)
+                    q_set =  Extract_Atoms_Set(qmol)
+                    q_list = Extract_Atoms_List(qmol)
+                    #print m_set, q_set
+                    #print m_list, q_list
+
+
+            #print 
+        idx+=1
+
+    #print 'Remove dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+
+    #print 'Is terminal ring'
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -1 or re == 0:
+            df = df.drop(df[df.smiles==row[1]].index)
+
+    #print df 
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        print 'There is no inter-connected ring'
+        return -1
+        #return 0
+
+    list_re =[]
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        re = Matching_Using_MakeScaffoldGeneric(m,patt)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        # For editiing
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #print atom_list
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=nei_atom_idx - atom_set
+                    #print 'Hi',is_idx
+                    is_idx = list(is_idx).pop()
+                    #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                    btype = m.GetBondBetweenAtoms(atom_idx,is_idx).GetBondType()
+                    atype = dic_atom_sym[is_idx]
+             
+                    atom_num = m.GetAtomWithIdx(is_idx).GetAtomicNum()
+                    #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                    #print 'Hi',i,atom_idx,is_idx,btype,atype
+                    ire = mw.AddAtom(Chem.Atom(atom_num))
+                    #print 'ire:',ire
+                    #print i,ire
+                    bre = mw.AddBond(i,ire,btype)
+                    #print 'bre:',bre
+                    #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    return list_re
+
+
+
+def Extract_Inner_Scaffold_2(asmi):
+
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+
+    '''
+    re = asmi.find('i')
+    if re != -1:
+        print 'Having \'i\''
+        return -1
+    '''
+
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+    # Test_Code
+    #smiles_1b  = Chem.MolToSmiles(m).replace('-','~')
+    #pattern_1b = Chem.MolFromSmarts(smiles_1b)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+
+    #print dic_atom_neig_idx
+    #print
+    #print dic_atom_neig_sym
+    #print 
+    #print dic_atom_sym
+    #print
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+    #print(df)
+    #return
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+    #print
+
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                #print match_list
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+
+                else:
+                    # using LSAlign 
+                    #pc_score = Align3D('m',row[1],'patt',p_smi)
+                    #print pc_score
+                    m_set = set()
+                    tmol = readstring('smi',row[1])
+                    m_set = Extract_Atoms_Set(tmol)
+                    m_list = Extract_Atoms_List(tmol)
+                    q_set = set()
+                    qmol = readstring('smi',p_smi)
+                    q_set =  Extract_Atoms_Set(qmol)
+                    q_list = Extract_Atoms_List(qmol)
+                    #print m_set, q_set
+                    #print m_list, q_list
+
+
+            #print 
+        idx+=1
+
+    #print 'Remove dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+
+    #print 'Is terminal ring'
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -1 or re == 0:
+            df = df.drop(df[df.smiles==row[1]].index)
+
+    #print df 
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        print 'There is no inter-connected ring'
+        #return -1
+        return 0
+
+    list_re =[]
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        re = Matching_Using_MakeScaffoldGeneric(m,patt)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        # For editiing
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #print atom_list
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=nei_atom_idx - atom_set
+                    #print 'Hi',is_idx
+                    is_idx = list(is_idx).pop()
+                    #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                    btype = m.GetBondBetweenAtoms(atom_idx,is_idx).GetBondType()
+                    atype = dic_atom_sym[is_idx]
+             
+                    atom_num = m.GetAtomWithIdx(is_idx).GetAtomicNum()
+                    #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                    #print 'Hi',i,atom_idx,is_idx,btype,atype
+                    ire = mw.AddAtom(Chem.Atom(atom_num))
+                    #print 'ire:',ire
+                    #print i,ire
+                    bre = mw.AddBond(i,ire,btype)
+                    #print 'bre:',bre
+                    #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    return list_re
+
+
+
+
+def Extract_Inner_Scaffold_3(asmi):
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+
+    #print dic_atom_neig_idx
+    #print
+    #print dic_atom_neig_sym
+    #print 
+    #print dic_atom_sym
+    #print
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+    t_df = copy.deepcopy(df)
+    #print(df)
+    #return
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+    #print
+
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                #print match_list
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+
+                else:
+                    # using LSAlign 
+                    #pc_score = Align3D('m',row[1],'patt',p_smi)
+                    #print pc_score
+                    m_set = set()
+                    tmol = readstring('smi',row[1])
+                    m_set = Extract_Atoms_Set(tmol)
+                    m_list = Extract_Atoms_List(tmol)
+                    q_set = set()
+                    qmol = readstring('smi',p_smi)
+                    q_set =  Extract_Atoms_Set(qmol)
+                    q_list = Extract_Atoms_List(qmol)
+                    #print m_set, q_set
+                    #print m_list, q_list
+
+
+            #print 
+        idx+=1
+
+    #print 'Remove dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+
+    #print 'Is terminal ring'
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -1 or re == 0:
+            df = df.drop(df[df.smiles==row[1]].index)
+
+    #print df 
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        print 'There is no inter-connected ring'
+        #return -1
+        return 0
+
+    list_re =[]
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        re = Matching_Using_MakeScaffoldGeneric(m,patt)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        # For editiing
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #print atom_list
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=nei_atom_idx - atom_set
+                    #print 'Hi',is_idx
+                    is_idx = list(is_idx).pop()
+                    #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                    btype = m.GetBondBetweenAtoms(atom_idx,is_idx).GetBondType()
+                    atype = dic_atom_sym[is_idx]
+             
+                    atom_num = m.GetAtomWithIdx(is_idx).GetAtomicNum()
+                    #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                    #print 'Hi',i,atom_idx,is_idx,btype,atype
+                    ire = mw.AddAtom(Chem.Atom(atom_num))
+                    #print 'ire:',ire
+                    #print i,ire
+                    bre = mw.AddBond(i,ire,btype)
+                    #print 'bre:',bre
+                    #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    # For merage 
+    #print 'In3',list_re,len(list_re)
+    if len(list_re)>1:
+        merged_smi = Merge_Scaffold(t_df,list_re)
+        #Attach_hand(m,merged_smi)
+        #print merged_smi
+        list_re = Attach_hand(m,merged_smi)
+        #return list_re
     else:
-        FNULL = open(os.devnull, 'w')
-        arg='rm '+t_dir+'*'
-        process = subprocess.Popen(arg, shell=True, stdout=FNULL,stderr=subprocess.STDOUT)
+        pass
 
-    for asdf in list_SDFs:
-        token=asdf[0].split('\n')
-        #print asdf
-        ofn = token[0]+'.sdf'
-        t1_dir = os.path.join(t_dir,ofn)
-        #print t_dir
-        print ' -> Writing file: ',t1_dir+'                     \r',
-        sys.stdout.flush()
-        fp_for_out = open(t1_dir,'w')
-        fp_for_out.write(asdf[0])
-        fp_for_out.close()
+    return list_re
+
+
+
+def Extract_Inner_Scaffold_4(asmi):
+
+    #m1 = Chem.MolFromSmiles(asmi,kekuleSmiles=True)
+    #amol = readstring('smi',asmi)
+    #my_smi = amol.write(format='smi')
+
+    # For substructure matching using RDKit
+    my_smi = Make_Canonical_SMI(asmi)
+    #print 'Canonical SMI:',my_smi
+    m = Chem.MolFromSmiles(my_smi)
+
+    if m==None:
+        return -1
+
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(my_smi)
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    #dic_atom_sym =  Extract_Atom_sym(my_smi)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    '''
+    print dic_atom_neig_idx
+    print
+    print dic_atom_neig_sym
+    print 
+    print dic_atom_sym
+    print
+    '''
+
+    #return
+
+    #df = Extract_SubScaffold(my_smi)
+    df = Extract_SubScaffold(asmi)
+    t_df = copy.deepcopy(df)
+    #print(df)
+    #return
+
+    '''
+    #amol = readstring('smi',alist[1])
+    ssr = Chem.GetSymmSSSR(m)
+    print len(ssr)
+    for aring in range(0,len(ssr)):
+        print list(ssr[aring])
+    return
+    '''
+
+    # Check SubScaffold is nomal
+    re = Check_SubScaffold(df)
+    
+    if re == -1:
+        return -1
+
+    #df = df.sort_values(by=['Ring_Num'],ascending=False)
+    #print df
+    #return
+
+    df = Leave_Ring_NoInterconnection(df)
+    df = df.sort_values(by=['Ring_Num'],ascending=False)
+   
+    #print 'Orginal DF'
+    #print df
+    #print
+
+    tmp_df = copy.deepcopy(df)
+    col_smiles_list = tmp_df['smiles'].tolist()
+    #print col_smiles_list
+
+    tmp_dic={}
+    Sidx_dic={}
+    Ridx_dic={}
+
+    idx = 0
+    ln_tmp_df = len(df)
+    for index,row in tmp_df.iterrows():
+        if int(row[0]) > 1:
+
+            #print 'orig:',row[0],row[1]
+            c_smi = Make_Canonical_SMI(row[1])
+            #print 'befor:',row[1],'after:',c_smi
+
+            tmp_mol = Chem.MolFromSmiles(c_smi)
+
+            #print  idx,ln_tmp_df
+
+            for l_idx in range(idx+1,ln_tmp_df):
+                #print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+                p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+                #print p_smi
+                patt = Chem.MolFromSmiles(p_smi)
+                try:
+                    match_list = tmp_mol.GetSubstructMatches(patt)
+                except:
+                    return -1
+                #print match_list
+                if len(match_list) != 0:
+                    df = df.drop(df[df.smiles==col_smiles_list[l_idx]].index)
+
+                else:
+                    # using LSAlign 
+                    #pc_score = Align3D('m',row[1],'patt',p_smi)
+                    #print pc_score
+                    m_set = set()
+                    tmol = readstring('smi',row[1])
+                    m_set = Extract_Atoms_Set(tmol)
+                    m_list = Extract_Atoms_List(tmol)
+                    q_set = set()
+                    qmol = readstring('smi',p_smi)
+                    q_set =  Extract_Atoms_Set(qmol)
+                    q_list = Extract_Atoms_List(qmol)
+                    #print m_set, q_set
+                    #print m_list, q_list
+
+
+            #print 
+        idx+=1
+
+    #print 'Remove dependency'
+    #print df 
+  
+    tmp_df = copy.deepcopy(df)
+
+    #print 'Is terminal ring'
+
+
+    Terminal_Scaffold_idx =[]
+    for index,row in tmp_df.iterrows():
+        #print 'orig:',row[0],row[1]
+        re = Is_terminal_Ring(m,row[1],dic_atom_neig_idx)
+        #print 're:',re
+        if re == -1 or re == 0:
+            df = df.drop(df[df.smiles==row[1]].index)
+            patt1 = Chem.MolFromSmiles(row[1])
+            match_list = m.GetSubstructMatches(patt1)
+            if len(match_list)>0:
+                #print 'Termianl scaffold:',match_list[0]
+                #print 'match_list:',match_list[0]
+                tmp = list(match_list[0])
+                tmp.sort()
+                #print tmp
+                Terminal_Scaffold_idx.append(tmp) 
+
+    #print 'Scaffold:',df 
+    #print 'Terminal scaffold idx list:',Terminal_Scaffold_idx
+    #return  
+
+    tmp_df = copy.deepcopy(df)
+
+    if len(tmp_df) == 0:
+        #print 'There is no inter-connected ring'
+        #return -1
+        return 0
+
+    list_re =[]
+    for index,row in tmp_df.iterrows():
+        p_smi = Make_Canonical_SMI(row[1])
+        #print p_smi
+        patt = Chem.MolFromSmiles(p_smi)
+        sma = Chem.MolToSmarts(patt)
+        patt_1 = Chem.MolFromSmarts(sma)
+        match_list = m.GetSubstructMatches(patt_1)
+        #print match_list
+
+        re = Matching_Using_MakeScaffoldGeneric(m,patt)
+
+
+        #####################################################################
+        ## Case 1. There is more than two same scaffolds of which is terminal scaffold in ligand
+        ## Romve the scaffold which is terminal scaffold 
+        # Convert the tuple 're' as list 're' to remove terminal scaffold
+        lst_re = []
+        for are in re:
+            tmp_re = list(are)
+            #print(tmp_re)
+            tmp_re.sort()
+            lst_re.append(tmp_re)
+        #print 'lst_re:',lst_re
+
+        lst_re2 = copy.deepcopy(lst_re)
+        # Check whether matching index is in terminal scaffold or not
+        if len(re)>=2:
+            tmp_re = list(re)
+            #print lst_re,re,type(re),'HIHIHIHI'
+            for aidx in lst_re:
+                if aidx in Terminal_Scaffold_idx:
+                    #print 'Terminal scaffold index:',aidx
+                    lst_re2.remove(aidx)
+        #print 'list_re2:',lst_re2
+        
+        # Convert the list_re2 as tuple re
+        #print re
+        re = tuple()
+        for are in lst_re2:
+            atp = tuple(are)
+            #print atp
+            re =re + (atp,)
+        #print 'Re:',re
+        #return
+        ## End Case 1. ########################################################
+
+
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_list2 = re
+
+        #print match_list2
+        if len(match_list)==0:
+            match_list = match_list2
+
+        #print 'At Ring match index: ', match_list
+        #return
+
+        # For editiing
+        mw = Chem.RWMol(patt)
+        list_re_tmp =[]
+        if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+            #print atom_list
+            #return
+
+            i = 0
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #print 'brench dff:',brench_diff
+                    '''
+                    for idx in range(0,brench_diff):
+                        print idx
+                    '''
+
+                    brench = brench + brench_diff
+                    #brench +=1 
+                    #print 'Hi',nei_atom_idx
+                    is_idx=list(nei_atom_idx - atom_set)
+                    #print 'nei_idx:',is_idx
+                    for tidx in range(0,brench_diff):
+                        ais_idx = is_idx.pop()
+                        #print tidx,ais_idx
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
+             
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'ire:',ire
+                        #print i,ire
+                        bre = mw.AddBond(i,ire,btype)
+                        #print 'bre:',bre
+                        #print 
+
+                i+=1 
+        #print 'brench:',brench 
+
+        try:
+            Chem.SanitizeMol(mw)
+            asmi = Chem.MolToSmiles(mw)
+            #print asmi
+            list_re_tmp.append(asmi)
+            list_re_tmp.append(row[1])
+            list_re_tmp.append(brench)
+            list_re.append(list_re_tmp)
+        except:
+            pass
+
+    #print list_re
+
+    if len(list_re) == 0:
+        return 0
+
+    # For merage 
+    #print 'In3',list_re,len(list_re)
+    if len(list_re)>1:
+        merged_smi = Merge_Scaffold(t_df,list_re)
+        #Attach_hand(m,merged_smi)
+        #print merged_smi
+        list_re = Attach_hand(m,merged_smi)
+        #return list_re
+    else:
+        pass
+
+    return list_re
+
+
+
+def Attach_hand(m,smi):
+    
+    p_smi = Make_Canonical_SMI(smi)
+    #print p_smi
+    patt = Chem.MolFromSmiles(p_smi)
+    sma = Chem.MolToSmarts(patt)
+    patt_1 = Chem.MolFromSmarts(sma)
+    match_list = m.GetSubstructMatches(patt_1)
+    #print match_list
+
+    if len(match_list) == 0:
+        core = MurckoScaffold.GetScaffoldForMol(m)
+        t_smi = Chem.MolToSmiles(core)
+        #print t_smi
+        core1 = MurckoScaffold.GetScaffoldForMol(patt)
+        match_list = core.GetSubstructMatches(core1)
+        #print match_list 
+        m = core
+        smi = p_smi
+
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+    mw = Chem.RWMol(patt)
+    list_re_tmp =[]
+    if len(match_list)>0:
+            X = list(match_list)
+            atom_list = list(X[0])
+            atom_set = set(X[0])
+            #print atom_list,atom_set
+
+            i = 0
+            brench = 0
+
+            for atom_idx in atom_list:
+                #print atom_idx
+                nei_atom = dic_atom_neig_sym[atom_idx]
+                nei_atom_idx = set(dic_atom_neig_idx[atom_idx])
+                #print nei_atom,nei_atom_idx
+
+                if len(nei_atom_idx - atom_set) != 0:
+                    brench_diff = len(nei_atom_idx - atom_set)
+                    #brench +=1 
+                    brench = brench + brench_diff
+                    #print 'Hi',nei_atom_idx
+                    is_idx=list(nei_atom_idx - atom_set)
+                    #print 'Hi',is_idx
+                    for tidx in range(0,brench_diff):
+                        ais_idx = list(is_idx).pop()
+                        #if (btype==Chem.rdchem.BondType.AROMATIC or btype==Chem.rdchem.BondType.DOUBLE or btype==Chem.rdchem.BondType.TRIPLE):
+                        btype = m.GetBondBetweenAtoms(atom_idx,ais_idx).GetBondType()
+                        atype = dic_atom_sym[ais_idx]
+             
+                        atom_num = m.GetAtomWithIdx(ais_idx).GetAtomicNum()
+                        #print 'atomic num:',m.GetAtomWithIdx(is_idx).GetAtomicNum()
+
+                        #print 'Hi',i,atom_idx,is_idx,btype,atype
+                        ire = mw.AddAtom(Chem.Atom(atom_num))
+                        #print 'ire:',ire
+                        #print i,ire
+                        bre = mw.AddBond(i,ire,btype)
+                        #print 'bre:',bre
+                        #print 
+                i+=1 
+    list_re = []
+    try:
+        Chem.SanitizeMol(mw)
+        asmi = Chem.MolToSmiles(mw)
+        #print asmi
+        list_re_tmp.append(asmi)
+        list_re_tmp.append(smi)
+        list_re_tmp.append(brench)
+        list_re.append(list_re_tmp)
+        return list_re
+    except:
+        list_re_tmp.append(0)
+        list_re.append(list_re_tmp)
+        return list_re
+
+def Merge_Scaffold(t_df,list_re):
+    tmp_list = []
+    t_num_ring=0
+    for alist in list_re:
+        tmp_list.append(alist[1])
+        try:
+            amol = readstring('smi',alist[1])
+        except:
+            print 'error in readstring'
+            return 0
+        list_ring = amol.sssr
+        num_ring = len(list_ring)
+        t_num_ring = t_num_ring+num_ring
+
+    #print t_num_ring
+    #ps_list = powerset(tmp_list)
+    #print tmp_list
+
+    tmp_df = t_df[t_df.Ring_Num == str(t_num_ring)]
+    #print tmp_df
+    for row in tmp_df.itertuples():
+        asmi = row[2]
+        maFR = Chem.MolFromSmiles(asmi)
+        yes_count=0
+        for as_smiles in tmp_list:
+            maOR = Chem.MolFromSmiles(as_smiles)
+            #print asmi
+            if maFR.HasSubstructMatch(maOR):
+                #print as_smiles,yes_count
+                yes_count+=1
+            if len(tmp_list) == yes_count:
+                #print asmi
+                return asmi
+
+
+
+def powerset(s):
+    tmp_list=[]
+    x = len(s)
+    for i in range(1 << x):
+        #print [s[j] for j in range(x) if (i & (1 << j))]
+        alist = [s[j] for j in range(x) if (i & (1 << j))]
+        if len(alist) >=2:
+            tmp_list.append(alist)
+    return tmp_list
+
+
+def Extract_Atoms_Set(pybelmol):
+
+    Atom_Set = set()
+    for atom in pybelmol:
+        Atom_Set.add(atom.type)
+
+    return Atom_Set
+        
+
+
+def Extract_Atoms_List(pybelmol):
+
+    Atom_List = []
+    for atom in pybelmol:
+        Atom_List.append(atom.type)
+
+    return Atom_List
+
+
+def Matching_Using_MakeScaffoldGeneric(rdmol,p_mol):
+
+    # Code: Matching using MakeScaffoldGeneric
+    try:
+        core = MurckoScaffold.GetScaffoldForMol(rdmol)
+        fw = MurckoScaffold.MakeScaffoldGeneric(core)
+    except:
+        return -1
+
+    try:
+        patt_g = MurckoScaffold.MakeScaffoldGeneric(p_mol)
+    except:
+        return -1
+
+    match_list = fw.GetSubstructMatches(patt_g)
+    return match_list
+
+
+
+def Is_terminal_Ring(rdmol,asmi,dic_atom_neig_idx):
+
+    #p_smi = Make_Canonical_SMI(asmi)
+    #print 'p_smi:',p_smi
+    patt1 = Chem.MolFromSmiles(asmi)
+    #patt1 = Chem.MolFromSmiles(p_smi)
+    '''
+    sma = Chem.MolToSmarts(patt1)
+    patt = Chem.MolFromSmarts(sma)
+    '''
+    match_list = rdmol.GetSubstructMatches(patt1)
+    #print match_list
+
+    ssr = Chem.GetSymmSSSR(patt1)
+
+    if len(match_list)==0 and len(ssr)>=2:
+    #if len(match_list)==0 and len(ssr)>=1:
+
+        re = Matching_Using_MakeScaffoldGeneric(rdmol,patt1)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_lsit2 = re
+
+        '''
+        # Test_Code: Matching using MakeScaffoldGeneric
+        core = MurckoScaffold.GetScaffoldForMol(rdmol)
+        fw = MurckoScaffold.MakeScaffoldGeneric(core)
+        #gf = Chem.MolToSmiles(fw)
+        #print gf
+
+        #patt_2 = MurckoScaffold.GetScaffoldForMol(patt1)
+        #patt_g = MurckoScaffold.MakeScaffoldGeneric(patt_2)
+        patt_g = MurckoScaffold.MakeScaffoldGeneric(patt1)
+        match_list2 = fw.GetSubstructMatches(patt_g)
+        #gf2 = Chem.MolToSmiles(patt_g)
+        #print 'gf2:',gf2
+        #print match_list2
+        '''
+        if len(match_list2)!=0:
+            match_list = match_list2
+
+    #print match_list
+
+    if len(match_list)!= 0:
+        for alist in match_list:
+            X = list(match_list)
+            atom_list = list(X[0])
+            #print atom_list
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx,len(dic_atom_neig_idx[atom_idx]), dic_atom_neig_idx[atom_idx]
+                nei_atoms = dic_atom_neig_idx[atom_idx]
+                for anei_atom in nei_atoms:
+                    if anei_atom not in atom_list:
+                        brench+=1
+        #print 'the number of brench:',brench
+        if brench == 1:
+            return -1
+        else:
+            #print '1'
+            return 1
+    else:
+        #print '0'
+        return 0
 
     return
 
 
-################################################################################
+
+def Is_terminal_Ring_2(rdmol,asmi,dic_atom_neig_idx):
+
+    ''' 
+    ssr = Chem.GetSymmSSSR(rdmol)
+    for aring in range(0,len(ssr)):
+        print list(ssr[aring])
+    '''
+
+    #p_smi = Make_Canonical_SMI(asmi)
+    #print 'p_smi:',p_smi
+    patt1 = Chem.MolFromSmiles(asmi)
+    #patt1 = Chem.MolFromSmiles(p_smi)
+    '''
+    sma = Chem.MolToSmarts(patt1)
+    patt = Chem.MolFromSmarts(sma)
+    '''
+    match_list = rdmol.GetSubstructMatches(patt1)
+
+    ssr = Chem.GetSymmSSSR(patt1)
+    #ln_ring_asmi = len(ssr)
+    #for aring in ssr:
+        
+
+
+    if len(match_list)==0 and len(ssr)>=2:
+
+        re = Matching_Using_MakeScaffoldGeneric(rdmol,patt1)
+        match_list2 = []
+        if re == -1:
+            pass 
+        else:
+            match_lsit2 = re
+
+        '''
+        # Test_Code: Matching using MakeScaffoldGeneric
+        core = MurckoScaffold.GetScaffoldForMol(rdmol)
+        fw = MurckoScaffold.MakeScaffoldGeneric(core)
+        #gf = Chem.MolToSmiles(fw)
+        #print gf
+
+        #patt_2 = MurckoScaffold.GetScaffoldForMol(patt1)
+        #patt_g = MurckoScaffold.MakeScaffoldGeneric(patt_2)
+        patt_g = MurckoScaffold.MakeScaffoldGeneric(patt1)
+        match_list2 = fw.GetSubstructMatches(patt_g)
+        #gf2 = Chem.MolToSmiles(patt_g)
+        #print 'gf2:',gf2
+        #print match_list2
+        '''
+        if len(match_list2)!=0:
+            match_list = match_list2
+
+    #print match_list
+
+    if len(match_list)!= 0:
+        for alist in match_list:
+            X = list(match_list)
+            atom_list = list(X[0])
+            #print atom_list
+            brench = 0
+            for atom_idx in atom_list:
+                #print atom_idx,len(dic_atom_neig_idx[atom_idx]), dic_atom_neig_idx[atom_idx]
+                nei_atoms = dic_atom_neig_idx[atom_idx]
+                for anei_atom in nei_atoms:
+                    if anei_atom not in atom_list:
+                        brench+=1
+        #print 'the number of brench:',brench
+        if brench == 1:
+            return -1
+        else:
+            #print '1'
+            return 1
+    else:
+        #print '0'
+        return 0
+
+    return
+
+
+
+def Extract_Atom_Neighbors(m):
+
+    #m = Chem.MolFromSmiles(asmi)
+
+    dic_atom_neig_idx = {}
+    dic_atom_neig_sym = {}
+
+    for atom in m.GetAtoms():
+        br1 = [x.GetIdx() for x in atom.GetNeighbors()]
+        br2 = [x.GetSymbol() for x in atom.GetNeighbors()]
+        dic_atom_neig_idx[atom.GetIdx()] = br1
+        dic_atom_neig_sym[atom.GetIdx()] = br2
+
+    #print dic_atom_neig_idx
+    #print dic_atom_neig_sym 
+
+    return dic_atom_neig_idx, dic_atom_neig_sym
+
+
+
+#def Extract_Atom_sym(asmi):
+def Extract_Atom_sym(m):
+
+    #m = Chem.MolFromSmiles(asmi)
+    dic_atom_sym = {}
+
+    for atom in m.GetAtoms():
+        dic_atom_sym[atom.GetIdx()] = atom.GetSymbol()
+
+    return dic_atom_sym
+
+
+
+def Make_Canonical_SMI(asmi):
+
+    amol = readstring('smi',asmi)
+    my_smi =amol.write(format='smi')
+    try:
+        ca_smi = Chem.MolToSmiles(Chem.MolFromSmiles(my_smi))
+    except:
+        print 'rdkit error: Cani\'t kekulize mol'
+        print 'converting using pybel'
+        ca_smi =amol.write(format='smi')
+        #sys.exit(1)
+        return ca_smi
+
+    return ca_smi
+
+
+def Is_Fusion_Ring(asmi):
+
+    #df = Extract_SubScaffold(asmi)
+
+    my_smi = Make_Canonical_SMI(asmi)
+    m = Chem.MolFromSmiles(my_smi)
+    #dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(m)
+    dic_atom_sym =  Extract_Atom_sym(m)
+
+
+    amol = readstring('smi',asmi)
+    list_ring=amol.sssr
+    num_ring = len(list_ring)
+    #print asmi,num_ring
+    #print dic_atom_sym
+    
+    tmp_set = set()
+
+    # Extracrt Ring_index !!!!!!!
+    r1 = set(list_ring[0]._path)
+    r2 = set(list_ring[1]._path)
+    
+    tmp_set = r1 & r2
+    
+    #print r1,r2
+    #print tmp_set
+
+    df = Extract_SubScaffold(asmi)
+    #print df
+    t_smi = ''
+
+    if len(tmp_set)>0:
+        #tmp_df = df.loc[df['Ring_Num']==str(2)]
+        tmp_df = df[df['Ring_Num']==str(2)]
+        #print tmp_df
+        for row in tmp_df.itertuples():
+            # selecting SMILES
+            t_smi = row[2]
+            #print t_smi
+
+            my_smi = Make_Canonical_SMI(asmi)
+            mol = Chem.MolFromSmiles(my_smi)
+
+            re_list = Attach_hand(mol,t_smi)
+            #print re_list
+
+        return re_list
+
+    else:
+        tmp_df = df[df['Ring_Num']==str(1)]
+
+        r1_smi =''
+        r2_smi =''
+        idx = 1
+        for row in tmp_df.itertuples():
+            if idx == 1:
+                r1_smi = row[2]
+            if idx == 2:
+                r2_smi = row[2]
+            idx+=1
+
+        #print r1_smi, r2_smi
+
+        R1_NC = r1_smi.count('N') + r1_smi.count('n')
+        R1_OC = r1_smi.count('O') + r1_smi.count('o')
+
+        R2_NC = r2_smi.count('N') + r2_smi.count('n')
+        R2_OC = r2_smi.count('O') + r2_smi.count('o')
+
+        R1_AF=R1_NC+R1_OC
+        R2_AF=R2_NC+R2_OC
+        #print R1_AF,R2_AF
+
+        my_smi = Make_Canonical_SMI(asmi)
+        mol = Chem.MolFromSmiles(my_smi)
+
+        if R1_AF > R2_AF:
+            re_list = Attach_hand(mol,r1_smi)
+
+        if R1_AF < R2_AF:
+            re_list = Attach_hand(mol,r2_smi)
+
+        if R1_AF == R2_AF:
+            tmp_df = df[df['Ring_Num']==str(2)]
+            for row in tmp_df.itertuples():
+                # selecting SMILES
+                t_smi = row[2]
+            re_list = Attach_hand(mol,t_smi)
+        
+        #print re_list
+
+        return re_list
+
+
+
+def Check_Ring_Total_Ring_Num(smi):
+
+    amol = readstring('smi',smi)
+    list_ring=amol.sssr
+    num_ring = len(list_ring)
+
+    return num_ring
+
+
+
+def Less_Than_Two_Ring(smi):
+
+    num_ring = Check_Ring_Total_Ring_Num(smi)
+
+    if num_ring == 1:
+        df = Extract_SubScaffold(smi)
+        tmp_df = df[df['Ring_Num']==str(1)]
+        for row in tmp_df.itertuples():
+            # selecting SMILES
+            t_smi = row[2]
+            my_smi = Make_Canonical_SMI(smi)
+            mol = Chem.MolFromSmiles(my_smi)
+            re_list = Attach_hand(mol,t_smi)
+            #print re_list
+            return re_list
+
+    if num_ring == 2:
+        re_list = Is_Fusion_Ring(smi)
+        return re_list
+
+    else:
+        return 0
+        
+
+def Show_Index_Information(asmi):
+
+    asmi = Make_Canonical_SMI(asmi)
+    amol = Chem.MolFromSmiles(asmi)
+
+    dic_atom_neig_idx, dic_atom_neig_sym =  Extract_Atom_Neighbors(amol)
+    dic_atom_sym = Extract_Atom_sym(amol)
+    
+    print
+    print 'dic_atom_neig_idx:',dic_atom_neig_idx
+    print 'dic_atom_neig_sym:',dic_atom_neig_sym
+    print 'dic_atom_sym:',dic_atom_sym
+    print
+
+
+
+
+def Check_Same_Scaffold(ssmi,tsmi):
+
+    # ssmi: scaffold smiles
+    # tsmi: target smiles
+
+    ssmi = Make_Canonical_SMI(ssmi)
+    tasmi = Make_Canonical_SMI(tsmi)
+
+    tm_mol = Chem.MolFromSmiles(tasmi)
+    patt = Chem.MolFromSmiles(ssmi)
+
+    ###############################
+    # For test driver
+    #Show_Index_Information(tsmi)
+    #Show_Index_Information(ssmi) 
+    ##############################
+
+
+    match_list = tm_mol.GetSubstructMatches(patt)
+    match_set = set(match_list[0])
+    #print 'match set:',match_set
+
+    p_ssr = Chem.GetSymmSSSR(patt)
+    s_ring_number = len(p_ssr)
+    #print s_ring_number
+
+    ssr = Chem.GetSymmSSSR(tm_mol) 
+    '''
+    print len(ssr)
+    for aring in ssr:
+        print set(list(aring))
+    #return
+    print '\n\n'
+    #return
+    '''
+
+    ring_count=0
+    for aring in ssr:
+        #print 'ring idex:',set(list(aring))
+        aring_path = set(list(aring)) 
+        tmp_set = (aring_path & match_set)
+        #print tmp_set
+        if len(aring_path & match_set) > 1:
+            #print 'found'
+            ring_count +=1
+        #print
+
+    #print ring_count
+
+    if s_ring_number == ring_count:
+        # Good
+        return 1
+    else:
+        # Bad
+        return -1
+
+
+
+    '''
+    ############
+    # Bad code because of wrong index: rdkit index is different from pybel
+    ############
+
+    # for num. of ring of scaffold 
+    smol = readstring('smi',ssmi)
+    list_ring=smol.sssr
+    s_ring_number = len(list_ring)
+    print s_ring_number
+
+
+    amol = readstring('smi',tsmi)
+    list_ring=amol.sssr
+    num_ring = len(list_ring)
+    print num_ring
+    #print list_ring
+    ring_count = 0 
+    
+    for aring in list_ring:
+        print 'ring idex:',aring._path
+        aring_path = set(aring._path)
+        tmp_set = (aring_path & match_set)
+        print tmp_set
+        if len(aring_path & match_set) > 1:
+            #print 'found'
+            ring_count +=1
+        print
+
+    print ring_count
+
+    if s_ring_number == ring_count:
+        return 1
+    else:
+        return -1
+    '''
+
+
+def MD_Backbone_show():
+    print '\'asmi\' means a smiles string'
+    print 'Extract_BB(asmi),str'
+    print 'ExtractM_BB(iPath),list'
+    print 'Extract_CP(asmi),str'
+    print 'Draw_BB_smi(o_path,f_name,smi),'
+    print 'Extract_SubScaffold(asmi),'
+    print 'Swap_Ring(asmi),'
+    print 'Extract_FusionR(asmi),'
+    print 'Read_SMILES_FILE(f_path),'
+    print 'Search_ASMILES(asmi,m_type),'
+    print 'Extract_SSSR_Idx(asmi),'
+    print 'Extract_Inner_Scaffold(asmi),'
+    print 'Extract_Inner_Scaffold_2(asmi)' # if there is no interConnected Ring return '0'
+    print 'Extract_Inner_Scaffold_3(asmi)' # if there is no interConnected Ring return '0' and merge two scafolds into one scafold
+    print 'Extract_Inner_Scaffold_4(asmi)' # bug fix: if a ligand has more than two hands at a index -> correct the num. of hands
+    print 'Make_Canonical_SMI(asmi),'
+
+    return
+
 def main():
+
+    # 2021.04.08.16:37
 
     parser=argparse.ArgumentParser()
     #parser.add_argument('-t',required=True, choices=['l','f'], default='n',  help='Input type: list(csv) or files(smi).')
     #parser.add_argument('-BB',required=True, choices=['y','n'], default='n',  help='Input type: Backbone or not backboen.')
-    #parser.add_argument('-i',required=True, help='Input list or path.')
-    #parser.add_argument('-top_p',required=True, default=0, help='Select the top X percent of scaffod frequency.')
-    #parser.add_argument('-mins',required=True, default=1, help='The minimum number of scaffold.')
-    #parser.add_argument('-img',required=True, choices=['y','n'], default='n',  help='Making the png files')
+    parser.add_argument('-i',required=False, help='Input list or path.')
     args=parser.parse_args()
 
-    #print i_type,i_content,i_BB
+    #iPath = args.i
+    #ExtractM_BB(iPath)
 
-    time1=time()
-    #os.system('clear')
-    #Extract_Mol()
-    #df = Extract_Chemical_Feature(i_path,m_type)
-    #Query_DB(df)
-    #Query_ScaffoldDB(in_file)
-    #Make_PDB_from_ADC()
-    #Make_BBR(in_file)
+    smi='COc1ccc(c2cc(C(=O)[O-])nc3c2c(C)nn3c2ccccc2)cc1'
+    smi='S(=O)(=O)(NC(=O)c1cc(c(Cc2c3c(n(c2)C)ccc(NC(=O)OC2CCCC2)c3)cc1)OC)c1c(C)cccc1'
+    smi='c1ccccc1S(=O)(=O)NC(=O)c2ccc(cc2)Cc4cnc3ccc(cc34)NC(=O)OC5CCCC5'
+    smi='c1nccc(c1)NC(=O)C(=O)c3cn(c2ncccc23)Cc4ncccc4'
+    #Extract_SubScaffold(smi)
+    #Extract_FusionR(smi)
+    #Swap_Ring(smi)
 
-    #df,f_list  = Processing_input(i_type,i_content)
-    #print df.head()
+
+    smi = 'O=C(c1ccco1)N1CCN(c2nc(c3ccccc3)nc3ccccc23)CC1'
+    #smi = 'C1=CC=C(C=C1)C3=C([N]2C=CN=CC2=N3)NC4=CC5=C(C=C4)OCCO5'
+
+    # seperated ring 
+    smi = 'O=C(c1occc1)N2CCNCC2'
+
+    # fusion ring
+    smi = 'c1ncc2ccccc2(n1)'
+
+
+    smi = 'CC(C)N(O)C1=CC(O)=CC2=NC(C)=NC=C12'
+    smi = 'COc1cc(C)oc1C(=O)N1CCNC(C1)[O](C)C'
+    smi = 'O=C(c1occc1)N2CCNCC2'
+    smi = 'O=C(C1CCCCC1)c1cccc1'
+    smi = 'CC(=O)N1CCNCC1'
+    smi = 'COC1CN(CCN1)C(C)=O'
+    smi = 'Cc1c(C(=O)N2CCN(c3ccccc3O)CC2)cnn1c1ccccc1Cl'
+    smi = 'CC1=NC2=C(N1)C=NC(C)=C2O'
+
+    # 5NDZ_8UN
+    #smi = 'c1cc2c(cc1C(=O)Nc1ccc(cc1)C#N)nc(n2[C@H](C1CCCCC1)C)c1cc2c(cc1Br)OCO2'
+
+    # 5NDZ_8TZ
+    smi = 'O[C@H](c1ncc[nH]1)c1ccc(F)cc1Cc1cncnc1'
+
+    # Test
+    #smi = 'CCc1ccc(c2cc(C(=O)Nc3cn(CC)nc3C(=O)NC3CCCC3)c3ccccc3n2)cc1'
+    smi = 'O=C1NC(=O)[C@@](c2ccccc2)(C2CCCCC2)N1'
+    smi = 'COCCSCCCSc1nnc(Cc2cccs2)n1C1CC1'
+    
+   
+    asmi = Make_Canonical_SMI(smi)
+    pmol = readstring('smi',asmi)
+    asmi = pmol.write(format='smi')
+    pBB = Extract_BB(asmi)
+    #print pBB
     #return
-    #if i_BB =='n':
-        #df = Make_BB(df,f_list)
-    #else:
-        #pass
-        
-    #print df.head()
-    #Extract_CP_SMILES2(i_type,i_content,df)
-
-    #Extract_ADC()
-    #yklee_work(3)
-    #yklee_work(4)
-    yklee_work(5)
-    #test_work()
 
 
-    time2=time()
-    print '\n\nTotal excution time: '+str('{:.2f}'.format(time2-time1))+' sec.'
-    print_date_time()
-    print '\n\n'
+    if Check_Ring_Total_Ring_Num(pBB) <=2:
+        #print 'less than 2'
+        re = Less_Than_Two_Ring(pBB)
+        print re
+    else:
+        #print 'more than 2'
+        #re = Extract_Inner_Scaffold_2(pBB)
+        #print 'R2',re
+        re = Extract_Inner_Scaffold_4(pBB)
+        print 'R3',re
+
+    return
+    #print re
+
+    #re_list = Extract_SSSR_Idx(smi)
+    #print re_list
+
+    # 8UN
+    #t_smi = 'O=C(c1ccc2c(c1)nc1CCCCCn21)N1CCN(c2ccccn2)CC1'
+
+    # 8TZ
+    #t_smi = 'O=C1CCc2ccc3[nH]ccc3c12'
+
+    # Test
+    t_smi = 'O=C(c1cc(C2CC2)nc2ccccc12)N1CCC1'
+    '''
+    tasmi = Make_Canonical_SMI(t_smi)
+    tm_mol = Chem.MolFromSmiles(tasmi)
+    patt = Chem.MolFromSmiles(re[0][0])
+    match_list = tm_mol.GetSubstructMatches(patt)
+    print match_list
+    print len(match_list[0])
+    match_set = set(match_list[0])
+
+    smol = readstring('smi',re[0][0])
+    list_ring=smol.sssr
+    print 'Source ring numnber:',len(list_ring)
+
+
+    amol = readstring('smi',tasmi)
+    list_ring=amol.sssr
+    #list_ring=tm_mol.sssr
+    num_ring = len(list_ring)
+    #print num_ring
+    #print list_ring
+    ring_count = 0 
+    for aring in list_ring:
+        #print 'ring idex:',aring._path
+        aring_path = set(aring._path)
+        #tmp_set = (aring_path & match_set)
+        #print tmp_set
+        if len(aring_path & match_set) > 0:
+            #print 'found'
+            ring_count +=1
+    print ring_count
+    '''
+    print re[0][0]
+
+    #print(Check_Same_Scaffold(re[0][0],t_smi))
+
+    smi = 'Cc1cc(C)c2ccccc2n1'
+    t_smi = 'c1ccc2c(c3ncn[nH]3)cc(C3CC3)nc2c1'
+    print(Check_Same_Scaffold(smi,t_smi))
+
+
+
+
+
+    #re = Extract_Atom_Neighbors(smi)
+    '''
+    my_smi='c1ccsc1C5Nc3ccc2ncccc2c3C4=C5(C(=O)CCC4)'
+    m = Chem.MolFromSmiles(my_smi)
+    c_smi_1='C=1C=CNCC=1'
+    c_smi_2='C=1C=CNCC=1'
+    patt = Chem.MolFromSmiles(c_smi)
+    list_match = m.GetSubstructMatches(patt)
+
+    t_smi = 'O=C1CCCC2=C1CNc1ccc3ncccc3c12'
+    t_smi = 'O=C4C=3CNc2ccc1ncccc1c2C=3CCC4'
+    print 'test smi:',t_smi 
+    m = Chem.MolFromSmiles(t_smi)
+
+    p_smi = 'O=C2C=1CNC=CC=1CCC2'  
+    #p_smi = 'O=C1CCCC2=C1CNC=C2'
+    #p_smi = Make_Canonical_SMI(p_smi)
+    print p_smi
+    patt = Chem.MolFromSmiles(p_smi)
+    sma = Chem.MolToSmarts(patt)
+    patt = Chem.MolFromSmarts(sma)
+    print sma
+    print type(patt)
+    match_list = m.GetSubstructMatches(patt)
+    print match_list
+
+
+    print 'col_smiles_list[l_idx]:',col_smiles_list[l_idx]
+    p_smi = Make_Canonical_SMI(col_smiles_list[l_idx])
+    print p_smi
+    patt = Chem.MolFromSmiles(p_smi)
+    match_list = tmp_mol.GetSubstructMatches(patt)
+    print match_list
+    '''
 
 
 
 if __name__=="__main__":
 
-    # 2021.04.05
-    # python 3D_Scan_Make_Scaffold_Backbone_list.Memo.v2.py -input ./Data/Input/ -top_p 0 -mins 1 -img n
-    # python Extract_CP_SMILES.v2.py -t f -BB n -i ./MOA/DMC_ligand/
+    # Ver 20210526, swshin
+    # Ver 20210623, 'Extract_Inner_Scaffold_2(asmi)'
+    # Ver 20210818, 'Extract_Inner_Scaffold_3(asmi) and Merge two scaffold into one scaffold!!!!'
+    # Ver 20210831, 'modifiy the Extract_Inner_Scaffold_4(asmi) and add !!!!'
+    # Ver 20210914, 'Bug Fix!'
     main()
+
