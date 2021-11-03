@@ -2648,13 +2648,11 @@ def Check_input(ainput):
         if rdmol is None or obmol is None:
                 return -1
         else:
-		return ainput
-		"""
 		if Chem.GetSSSR(rdmol) <2:
 			pass
 		else:
 			#print(ainput)
-			return ainput"""
+			return ainput
 
 
 def yklee_work(a_type):
@@ -2682,7 +2680,7 @@ def yklee_work(a_type):
 		pass
 	else:
 		os.makedirs(rei_img_Path)
-	#remain_out = sorted(glob.glob(out_csv_path + "*.csv"))
+
 	if_list = sorted(glob.glob(iPath + "*.smi"))
 	if len(if_list) == 0:
 		print("No Input Files")
@@ -2700,7 +2698,6 @@ def yklee_work(a_type):
 			pass
 		else:
 			fif_list.append(returns)
-	print(fif_list)
 	out_file1 = "./Data/ADC_Output/Out_Summary.csv"
 	out_file2 = "./Data/ADC_Output/Error_SMILES.txt"
 	for afile in fif_list:
@@ -2745,10 +2742,19 @@ def yklee_work(a_type):
 				bblist = 1
 		elif a_type == 5:
 			total_df = Search_About_2DBs(asmi,file_name,afile,Input_CP)
-			if total_df.empty:
+			#if total_df == 2:
+			if type(total_df) is pd.DataFrame:
+				if total_df.empty:
+					temp_txt = "Empty_Result"
+					bblist = -1
+				else:
+					bblist = 1
+			elif type(total_df) is int:
 				bblist = -1
+				temp_txt = "OBConversion_Error"
 			else:
-				bblist = 1
+				print("bblist type Error")
+				sys.exit(1)
 		else:
 			sys.exit(1)
 
@@ -2756,7 +2762,8 @@ def yklee_work(a_type):
 		# Make Result Format #
 		######################
 		if bblist == -1:
-			pass
+			sum_df = pd.DataFrame()
+			#pass
 		else:
 			if a_type == 0 or a_type == 1:
 				ZIDs,zdf = BB_Align_Class_Search(Extract_BB(asmi),asmi,file_name,bblist,ZIDs,N_ZIDs_cutoff)
@@ -2772,11 +2779,15 @@ def yklee_work(a_type):
 		# Make Summary #
 		################
 		if bblist == -1:
-			pass
+			if sum_df.empty:
+				with open(out_file2,"a") as W:
+					W.write(file_name + "\t" + asmi + "\t" + temp_txt + "\n")
+			#pass
+			#sum_df = pd.DataFrame()
 		else:
 			if sum_df.empty:
 				with open(out_file2,"a") as W:
-					W.write(file_name + "\t" + asmi + '\n')
+					W.write(file_name + "\t" + asmi + "\t" + temp_txt + '\n')
 			else:
 				if not os.path.exists(out_file1):
 					sum_df.to_csv(out_file1,index=False,mode="w")
@@ -3068,6 +3079,8 @@ def working_ZDC2(asmi,file_name,afile,InputCP):
 	re_list1 = working_a1(asmi,file_name,afile)
 	if re_list1 == -1:
 		return pd.DataFrame()
+	elif re_list1 == 2:
+		return re_list1
 	else:
 		re_list = re_list|set(re_list1)
 
@@ -3101,6 +3114,8 @@ def working_a4(asmi,file_name,afile,InputCP):
 	re_list1 = working_a1_deep(asmi,file_name,afile)
 	if re_list1 == -1:
 		return pd.DataFrame()
+	elif re_list1 == 2:
+		return re_list1
 	else:
 		re_list = re_list|set(re_list1)
 	ZIDs,zdf = BB_Align_Class_Search(aBB,asmi,file_name,re_list,ZIDs,N_ZIDs_cutoff,InputCP)
@@ -3115,13 +3130,28 @@ def working_a4(asmi,file_name,afile,InputCP):
 		return zdf
 
 def Search_About_2DBs(asmi,file_name,afile,InputCP):
+    total_df = pd.DataFrame()
+    temp_df = pd.DataFrame()
     total_df = working_ZDC2(asmi,file_name,afile,InputCP)
-    if total_df.empty or len(total_df) <=500:
+    print(total_df)
+    """if total_df == 2:
         temp_df = working_a4(asmi,file_name,afile,InputCP)
-        temp_df["Purchasability"] = "Unknown"
-    else:
-        total_df["Search On"] = "Purchasable DB"
-        return total_df
+        if temp_df == 2:
+            return 2
+        else: pass"""
+    try:
+        if total_df == 2:
+            print("tt")
+            return 2
+    except:
+        pass
+    temp_df = working_a4(asmi,file_name,afile,InputCP)
+    #if total_df.empty : #or len(total_df) <=500:
+    #    temp_df = working_a4(asmi,file_name,afile,InputCP)
+    #    temp_df["Purchasability"] = "Unknown"
+    #else:
+    #    total_df["Search On"] = "Purchasable DB"
+    #    return total_df
     #total_df["Search On"] = "Purchasable DB"
     #temp_df["Search On"] = "All DB"
     if temp_df.empty and total_df.empty:
@@ -3132,6 +3162,7 @@ def Search_About_2DBs(asmi,file_name,afile,InputCP):
     else:
         total_df["Search On"] = "Purchasable DB"
         temp_df["Search On"] = "All DB"
+        temp_df["Purchasability"] = "Unknown"
         re_df = pd.concat([total_df,temp_df[1:]])
     re_df = re_df[['ZID',"Z_PCScore",'BB_PCScore','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity','SMILES',"Purchasability","Tier","Search On"]]
     re_df1 = pd.concat([re_df[:1],re_df[1:].sort_values(by="Z_PCScore",ascending=False)])
@@ -3842,6 +3873,8 @@ def T15_Class_Search_yklee(afile,TR_MW,M_MW):
 	if InSCF_list == -1 or not InSCF_list: # pass point 3
 		print("There is no \"Scaffold\" in the Mol")
 		return -1
+	elif InSCF_list == 2:
+		return InSCF_list
 	t_mw = 0
 	manager = Manager()
 	Re_Zid_list = manager.list()
@@ -3921,10 +3954,13 @@ def T15_Class_Search(afile,TR_MW,M_MW):
 		#InSCF_list = Extract_Inner_Scaffold_4(pBB)
                 #inSCF_list = Extract_Inner_Scaffold_5(pBB)
                 InSCF_list = Extract_Inner_Scaffold_6(pBB)
-    print(InSCF_list)
     if InSCF_list == -1 or not InSCF_list: # pass point 3
         print("There is no \"Scaffold\" in the Mol")
         return -1
+    elif InSCF_list == 2:
+        return InSCF_list
+    else:
+        pass
     t_mw = 0
     manager = Manager()
     Re_Zid_list = manager.list()
@@ -4268,7 +4304,7 @@ def main():
     #print i_type,i_content,i_BB
 
     time1=time()
-    #os.system('clear')
+    os.system('clear')
     #Extract_Mol()
     #df = Extract_Chemical_Feature(i_path,m_type)
     #Query_DB(df)

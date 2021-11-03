@@ -205,12 +205,15 @@ class Connect_PCP:
             sys.exit(1)
         rows = self.cursorObj.fetchall()
         df = pd.DataFrame(rows)
-        for idx,line in df.iterrows():
-            tmp.append("Purchasable")
-        df["p"] = tmp
-        col_name = ['ZID','SMILES','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity',"Purchasability"]
-        df.columns = col_name
-        return df
+        if df.empty:
+            pass
+        else:
+            for idx,line in df.iterrows():
+                tmp.append("Purchasable")
+            df["p"] = tmp
+            col_name = ['ZID','SMILES','MW','LogP','TPSA','RotatableB','HBD','HBA','Ring','Total_Charge','HeavyAtoms','CarBonAtoms','HeteroAtoms','Lipinski_Violation','VeBer_Violation','Egan_Violation','Toxicity',"Purchasability"]
+            df.columns = col_name
+            return df
 
 def Final_Annot(idid,id_BB,pcscore):
     id_df = []
@@ -297,10 +300,15 @@ def Make_result(a_type,wsmi,file_name,id_set,ncutoff,aBB,InputCP,DB_Path):
 
     fin_df1 = pd.merge(fin_df,z_pcscore[["ZID","Z_PCScore"]],on="ZID").sort_values(by="PCScore",ascending=False).rename(columns={"PCScore":"BB_PCScore"})
     fin_df1 = pd.concat([wsmi_df,fin_df1])
-    fin_df1 = fin_df1[["ZID","Z_PCScore","BB_PCScore","MW","LogP","TPSA",\
-                       "RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms",\
-                       "CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation",\
-                       "Egan_Violation","Toxicity","SMILES","Backbone","Purchasability","Tier"]]
+    print(fin_df1)
+    if a_type != 4:
+        col_name = ["ZID","Z_PCScore","BB_PCScore","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","SMILES","Backbone","Purchasability","Tier"]
+    elif a_type == 4:
+        col_name = ["ZID","Z_PCScore","BB_PCScore","MW","LogP","TPSA","RotatableB","HBD","HBA","Ring","Total_Charge","HeavyAtoms","CarBonAtoms","HeteroAtoms","Lipinski_Violation","VeBer_Violation","Egan_Violation","Toxicity","SMILES","Backbone","Tier"]
+    else:
+        pass
+    fin_df1 =fin_df1[col_name]
+    
     fin_df1.to_csv(output_path + file_name + "_" + str(ncutoff) + ".csv",index=False)
     return id_set,fin_df1
 
